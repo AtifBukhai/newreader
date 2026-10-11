@@ -205,9 +205,24 @@ type Action =
   | { type: 'RESET_STATE' };
 
 function loadState(): AppState {
+  let state: AppState;
   try {
     const saved = localStorage.getItem('kitabo-state-v2');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      state = JSON.parse(saved);
+      // Re-validate currentUser against the users array on load
+      // This handles cases where a user was suspended after their session was saved
+      if (state.currentUser) {
+        const freshUser = state.users.find(u => u.id === state.currentUser!.id);
+        if (freshUser) {
+          state.currentUser = { ...freshUser, lastLogin: state.currentUser.lastLogin };
+        } else {
+          // User no longer exists, clear session
+          state.currentUser = null;
+        }
+      }
+      return state;
+    }
   } catch (e) { console.error('Failed to load state:', e); }
   return {
     currentUser: null, users: MOCK_USERS, partners: MOCK_PARTNERS, classrooms: MOCK_CLASSROOMS,
@@ -289,8 +304,12 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, notifications: state.notifications.filter(n => n.id !== action.payload) };
     case 'ADD_USER':
       return { ...state, users: [...state.users, action.payload] };
-    case 'UPDATE_USER':
-      return { ...state, users: state.users.map(u => u.id === action.payload.id ? action.payload : u) };
+    case 'UPDATE_USER': {
+      const updatedUsers = state.users.map(u => u.id === action.payload.id ? action.payload : u);
+      // If the updated user is the current user, sync the currentUser too
+      const updatedCurrentUser = state.currentUser?.id === action.payload.id ? action.payload : state.currentUser;
+      return { ...state, users: updatedUsers, currentUser: updatedCurrentUser };
+    }
     case 'REGISTER_DEVICE':
       return { ...state, devices: [...state.devices, action.payload] };
     case 'ADD_EXPORT':

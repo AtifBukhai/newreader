@@ -104,6 +104,12 @@ function AuthPage() {
               </button>
             ))}
           </div>
+          <button
+            onClick={() => { localStorage.removeItem('kitabo-state-v2'); window.location.reload(); }}
+            className="w-full mt-4 text-xs text-helix-muted/60 hover:text-helix-muted transition-colors"
+          >
+            Reset all demo data
+          </button>
         </div>
       </div>
     </div>
@@ -1461,9 +1467,46 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
 }
 
 function AuthRoute() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
+  const navigate = useNavigate();
+
+  const handleSignOut = () => {
+    dispatch({ type: 'LOGOUT' });
+    navigate('/', { replace: true });
+  };
+
   if (state.currentUser) {
-    if (state.currentUser.status !== 'active') return <><div className="min-h-screen flex items-center justify-center"><div className="text-center glass rounded-xl p-8"><AlertTriangle className="w-12 h-12 text-helix-warning mx-auto mb-4" /><h2 className="text-xl font-bold mb-2">Account Suspended</h2><p className="text-helix-muted mb-4">Your account has been suspended. Contact support.</p><button onClick={() => window.location.reload()} className="px-4 py-2 bg-helix-card rounded-lg text-sm">Sign out</button></div></div></>;
+    if (state.currentUser.status !== 'active') {
+      const statusLabel = state.currentUser.status === 'suspended' ? 'Suspended' : 'Deactivated';
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-gradient-to-br from-helix-bg via-helix-surface to-helix-bg" />
+          <div className="relative text-center glass rounded-2xl p-8 max-w-md w-full glow animate-fade-in">
+            <div className="w-16 h-16 rounded-2xl bg-helix-warning/20 flex items-center justify-center mx-auto mb-5">
+              <AlertTriangle className="w-8 h-8 text-helix-warning" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Account {statusLabel}</h2>
+            <p className="text-helix-muted mb-2">
+              Your account <span className="text-helix-text font-medium">{state.currentUser.email}</span> has been {statusLabel.toLowerCase()}.
+            </p>
+            <p className="text-sm text-helix-muted mb-6">
+              Please contact your administrator or platform support to resolve this issue.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleSignOut}
+                className="w-full px-6 py-3 bg-gradient-to-r from-helix-primary to-helix-primary-light text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+              >
+                Sign Out & Return to Login
+              </button>
+              <p className="text-xs text-helix-muted">
+                Signing out will clear your session. You can then sign in with a different account.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     const routes: Record<string, string> = { super_admin: '/admin', support_agent: '/support', partner_admin: '/partner', student: '/student' };
     return <Navigate to={routes[state.currentUser.role] || '/'} replace />;
   }
