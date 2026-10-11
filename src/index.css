@@ -174,3 +174,30 @@ html, body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Print protection - prevent printing of reader content */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  body::after {
+    content: "This content is protected and cannot be printed.";
+    visibility: visible !important;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    color: #333;
+    text-align: center;
+  }
+}
+
+/* Disable text selection in reader for content protection */
+.reader-protected {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}

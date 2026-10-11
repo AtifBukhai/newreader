@@ -7,7 +7,7 @@ import {
   BookOpen, Users, GraduationCap, Shield, Settings, LogOut, Home, Library,
   Key, BarChart3, FileText, Search, Plus, Edit, Trash2, Eye, EyeOff,
   ChevronRight, ChevronLeft, Bookmark, Highlighter, Volume2, VolumeX,
-  Menu, X, Bell, User, BookMarked, Clock, TrendingUp, AlertCircle,
+  Menu, X, Bell, User as UserIcon, BookMarked, Clock, TrendingUp, AlertCircle,
   Check, Download, Filter, ArrowRight, Layers, Globe,
   Award, Target, Zap, ShoppingCart, Package, Headphones, RefreshCw,
   ClipboardList, FileDown, Smartphone, Lock, AlertTriangle, History
@@ -323,35 +323,121 @@ function AdminOrders() {
   const { state, dispatch } = useApp();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<Order | null>(null);
+  const [page, setPage] = useState(1);
+  const perPage = 15;
+
   const filtered = state.orders.filter(o => (statusFilter === 'all' || o.status === statusFilter) && (o.orderId.toLowerCase().includes(search.toLowerCase()) || state.partners.find(p => p.id === o.partnerId)?.name.toLowerCase().includes(search.toLowerCase()) || state.books.find(b => b.id === o.bookId)?.title.toLowerCase().includes(search.toLowerCase())));
+  const paged = filtered.slice((page - 1) * perPage, page * perPage);
+  const totalPages = Math.ceil(filtered.length / perPage);
+
+  const handleApprove = (order: Order) => {
+    const updated: Order = { ...order, status: 'approved', updatedAt: new Date().toISOString() };
+    dispatch({ type: 'UPDATE_ORDER', payload: updated });
+    dispatch({ type: 'ADD_AUDIT_LOG', payload: { id: uuidv4(), userId: state.currentUser!.id, action: 'order.approved', resource: 'Order', resourceId: order.id, details: `Approved order ${order.orderId}`, createdAt: new Date().toISOString() } });
+    dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Order ${order.orderId} approved`, type: 'success' } });
+    setSelectedOrder(null);
+  };
+
+  const handleCancel = (order: Order) => {
+    const updated: Order = { ...order, status: 'cancelled', updatedAt: new Date().toISOString() };
+    dispatch({ type: 'UPDATE_ORDER', payload: updated });
+    dispatch({ type: 'ADD_AUDIT_LOG', payload: { id: uuidv4(), userId: state.currentUser!.id, action: 'order.cancelled', resource: 'Order', resourceId: order.id, details: `Cancelled order ${order.orderId}`, createdAt: new Date().toISOString() } });
+    dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Order ${order.orderId} cancelled`, type: 'success' } });
+    setConfirmCancel(null); setSelectedOrder(null);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div><h1 className="text-2xl font-bold">Orders</h1><p className="text-helix-muted mt-1">Manage all platform orders</p></div>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <StatCard icon={ClipboardList} label="Total" value={state.orders.length} color="primary" />
+        <StatCard icon={Clock} label="Pending" value={state.orders.filter(o => o.status === 'submitted' || o.status === 'approved').length} color="warning" />
+        <StatCard icon={Package} label="Processing" value={state.orders.filter(o => o.status === 'processing').length} color="accent" />
+        <StatCard icon={Check} label="Fulfilled" value={state.orders.filter(o => o.status === 'fulfilled').length} color="success" />
+        <StatCard icon={AlertTriangle} label="Cancelled" value={state.orders.filter(o => o.status === 'cancelled').length} color="warning" />
+      </div>
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-helix-muted" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by Order ID, Partner, Book..." className="w-full pl-10 pr-4 py-2.5 bg-helix-surface border border-helix-border rounded-xl text-sm focus:border-helix-primary focus:outline-none" /></div>
-        <div className="flex gap-2 flex-wrap">{['all', 'submitted', 'approved', 'processing', 'fulfilled', 'cancelled'].map(s => (<button key={s} onClick={() => setStatusFilter(s)} className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${statusFilter === s ? 'bg-helix-primary text-white' : 'bg-helix-card text-helix-muted hover:text-helix-text'}`}>{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>))}</div>
+        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-helix-muted" /><input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search by Order ID, Partner, Book..." className="w-full pl-10 pr-4 py-2.5 bg-helix-surface border border-helix-border rounded-xl text-sm focus:border-helix-primary focus:outline-none" /></div>
+        <div className="flex gap-2 flex-wrap">{['all', 'draft', 'submitted', 'approved', 'processing', 'fulfilled', 'cancelled'].map(s => (<button key={s} onClick={() => { setStatusFilter(s); setPage(1); }} className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${statusFilter === s ? 'bg-helix-primary text-white' : 'bg-helix-card text-helix-muted hover:text-helix-text'}`}>{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>))}</div>
       </div>
       <div className="glass rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-helix-bg/50"><tr><th className="text-left px-4 py-3 text-helix-muted font-medium">Order ID</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Partner</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Book</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Qty</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Validity</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Devices</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Status</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Date</th></tr></thead>
+            <thead className="bg-helix-bg/50"><tr><th className="text-left px-4 py-3 text-helix-muted font-medium">Order ID</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Partner</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Book</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Qty</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Validity</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Devices</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Status</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Date</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Actions</th></tr></thead>
             <tbody>
-              {filtered.map(o => (
-                <tr key={o.id} className="border-t border-helix-border hover:bg-helix-bg/30 cursor-pointer" onClick={() => {}}>
+              {paged.map(o => (
+                <tr key={o.id} className="border-t border-helix-border hover:bg-helix-bg/30">
                   <td className="px-4 py-3 font-mono text-xs font-medium">{o.orderId}</td>
-                  <td className="px-4 py-3 text-helix-muted">{state.partners.find(p => p.id === o.partnerId)?.name || '-'}</td>
-                  <td className="px-4 py-3">{state.books.find(b => b.id === o.bookId)?.title || '-'}</td>
+                  <td className="px-4 py-3 text-helix-muted text-xs">{state.partners.find(p => p.id === o.partnerId)?.name || '-'}</td>
+                  <td className="px-4 py-3 text-xs">{state.books.find(b => b.id === o.bookId)?.title || '-'}</td>
                   <td className="px-4 py-3">{o.quantity}</td>
-                  <td className="px-4 py-3 text-helix-muted">{o.validityDays}d</td>
-                  <td className="px-4 py-3 text-helix-muted">{o.maxDevices}</td>
+                  <td className="px-4 py-3 text-helix-muted text-xs">{o.validityDays}d</td>
+                  <td className="px-4 py-3 text-helix-muted text-xs">{o.maxDevices}</td>
                   <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
-                  <td className="px-4 py-3 text-helix-muted">{new Date(o.orderDate).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-helix-muted text-xs">{new Date(o.orderDate).toLocaleDateString()}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button onClick={() => setSelectedOrder(o)} className="text-helix-primary hover:text-helix-primary-light text-xs flex items-center gap-1"><Eye className="w-3 h-3" /> View</button>
+                      {o.status === 'submitted' && <button onClick={() => handleApprove(o)} className="text-helix-success hover:text-helix-success/80 text-xs">Approve</button>}
+                      {(o.status === 'submitted' || o.status === 'approved' || o.status === 'draft') && <button onClick={() => setConfirmCancel(o)} className="text-helix-danger hover:text-helix-danger/80 text-xs">Cancel</button>}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-helix-border">
+            <span className="text-xs text-helix-muted">Showing {(page-1)*perPage+1}-{Math.min(page*perPage, filtered.length)} of {filtered.length}</span>
+            <div className="flex gap-2">
+              <button onClick={() => setPage(Math.max(1, page-1))} disabled={page === 1} className="px-3 py-1 rounded bg-helix-card text-xs disabled:opacity-30">Prev</button>
+              <button onClick={() => setPage(Math.min(totalPages, page+1))} disabled={page === totalPages} className="px-3 py-1 rounded bg-helix-card text-xs disabled:opacity-30">Next</button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Order Detail Modal */}
+      {selectedOrder && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4" onClick={() => setSelectedOrder(null)}>
+          <div className="glass rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto animate-fade-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2"><ClipboardList className="w-5 h-5 text-helix-primary" /> Order: {selectedOrder.orderId}</h3>
+              <button onClick={() => setSelectedOrder(null)} className="p-1 rounded hover:bg-helix-card"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="space-y-3">
+                <div><p className="text-xs text-helix-muted">Partner</p><p className="text-sm font-medium">{state.partners.find(p => p.id === selectedOrder.partnerId)?.name}</p></div>
+                <div><p className="text-xs text-helix-muted">Book</p><p className="text-sm font-medium">{state.books.find(b => b.id === selectedOrder.bookId)?.title}</p></div>
+                <div><p className="text-xs text-helix-muted">Requested By</p><p className="text-sm font-medium">{state.users.find(u => u.id === selectedOrder.requestedBy)?.name}</p></div>
+                <div><p className="text-xs text-helix-muted">Order Date</p><p className="text-sm">{new Date(selectedOrder.orderDate).toLocaleString()}</p></div>
+              </div>
+              <div className="space-y-3">
+                <div><p className="text-xs text-helix-muted">Quantity</p><p className="text-sm font-bold text-helix-primary">{selectedOrder.quantity} codes</p></div>
+                <div><p className="text-xs text-helix-muted">Validity</p><p className="text-sm">{selectedOrder.validityDays} days</p></div>
+                <div><p className="text-xs text-helix-muted">Max Devices</p><p className="text-sm">{selectedOrder.maxDevices}</p></div>
+                <div><p className="text-xs text-helix-muted">Status</p><StatusBadge status={selectedOrder.status} /></div>
+              </div>
+            </div>
+            {selectedOrder.fulfilledAt && (
+              <div className="bg-helix-success/10 border border-helix-success/20 rounded-lg p-3 mb-4">
+                <p className="text-xs text-helix-success">Fulfilled on {new Date(selectedOrder.fulfilledAt).toLocaleString()} by {state.users.find(u => u.id === selectedOrder.fulfilledBy)?.name}</p>
+                {selectedOrder.fulfillmentNotes && <p className="text-xs text-helix-muted mt-1">{selectedOrder.fulfillmentNotes}</p>}
+              </div>
+            )}
+            <div className="flex gap-2 justify-end">
+              {selectedOrder.status === 'submitted' && <button onClick={() => handleApprove(selectedOrder)} className="px-4 py-2 bg-helix-success text-white rounded-lg text-sm font-medium hover:opacity-90">Approve Order</button>}
+              {(selectedOrder.status === 'submitted' || selectedOrder.status === 'approved') && <button onClick={() => setConfirmCancel(selectedOrder)} className="px-4 py-2 bg-helix-danger/20 text-helix-danger rounded-lg text-sm font-medium hover:bg-helix-danger/30">Cancel Order</button>}
+              <button onClick={() => setSelectedOrder(null)} className="px-4 py-2 bg-helix-card rounded-lg text-sm">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog open={!!confirmCancel} title="Cancel Order" message={`Are you sure you want to cancel order ${confirmCancel?.orderId}? This action cannot be undone.`} onConfirm={() => confirmCancel && handleCancel(confirmCancel)} onCancel={() => setConfirmCancel(null)} danger />
     </div>
   );
 }
@@ -430,6 +516,7 @@ function AdminUsers() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState({ name: '', email: '', role: '' as UserRole, partnerId: '', status: '' as string });
   const [confirmAction, setConfirmAction] = useState<{ user: User; action: string } | null>(null);
+  const [showAuditHistory, setShowAuditHistory] = useState<User | null>(null);
 
   const filtered = roleFilter === 'all' ? state.users : state.users.filter(u => u.role === roleFilter);
 
@@ -491,6 +578,7 @@ function AdminUsers() {
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
                       <button onClick={() => openEdit(user)} className="text-helix-primary hover:text-helix-primary-light text-xs flex items-center gap-1"><Edit className="w-3 h-3" /> Edit</button>
+                      <button onClick={() => setShowAuditHistory(user)} className="text-helix-muted hover:text-helix-text text-xs flex items-center gap-1"><History className="w-3 h-3" /> History</button>
                       <button onClick={() => setConfirmAction({ user, action: 'reset_password' })} className="text-helix-accent hover:text-helix-accent-light text-xs flex items-center gap-1"><RefreshCw className="w-3 h-3" /> Reset PW</button>
                       {user.status === 'active' ? <button onClick={() => setConfirmAction({ user, action: 'suspend' })} className="text-helix-danger hover:text-helix-danger/80 text-xs">Suspend</button> : <button onClick={() => setConfirmAction({ user, action: 'activate' })} className="text-helix-success hover:text-helix-success/80 text-xs">Activate</button>}
                     </div>
@@ -523,12 +611,38 @@ function AdminUsers() {
       )}
 
       <ConfirmDialog open={!!confirmAction} title={confirmAction?.action === 'suspend' ? 'Suspend User' : confirmAction?.action === 'activate' ? 'Activate User' : 'Reset Password'} message={confirmAction?.action === 'reset_password' ? `Generate a password reset for ${confirmAction?.user.name}? A secure reset link will be created.` : `${confirmAction?.action === 'suspend' ? 'Suspend' : 'Activate'} ${confirmAction?.user.name}?`} onConfirm={handleConfirmAction} onCancel={() => setConfirmAction(null)} danger={confirmAction?.action === 'suspend'} />
+
+      {/* Audit History Modal */}
+      {showAuditHistory && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4" onClick={() => setShowAuditHistory(null)}>
+          <div className="glass rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto animate-fade-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2"><History className="w-5 h-5 text-helix-primary" /> Activity History: {showAuditHistory.name}</h3>
+              <button onClick={() => setShowAuditHistory(null)} className="p-1 rounded hover:bg-helix-card"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-2">
+              {state.auditLogs.filter(l => l.userId === showAuditHistory.id || l.resourceId === showAuditHistory.id || l.details.includes(showAuditHistory.name) || l.details.includes(showAuditHistory.email)).slice(0, 30).map(log => (
+                <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-helix-bg/50">
+                  <div className="w-8 h-8 rounded-full bg-helix-primary/20 flex items-center justify-center flex-shrink-0"><Zap className="w-4 h-4 text-helix-primary" /></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2"><code className="px-1.5 py-0.5 bg-helix-bg rounded text-xs text-helix-accent">{log.action}</code><span className="text-xs text-helix-muted">{new Date(log.createdAt).toLocaleString()}</span></div>
+                    <p className="text-sm mt-1">{log.details}</p>
+                  </div>
+                </div>
+              ))}
+              {state.auditLogs.filter(l => l.userId === showAuditHistory.id || l.resourceId === showAuditHistory.id).length === 0 && (
+                <p className="text-sm text-helix-muted text-center py-4">No activity recorded for this user.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function AdminReports() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const totalCodes = state.codes.length;
   const redeemed = state.codes.filter(c => c.status === 'redeemed').length;
   const available = state.codes.filter(c => c.status === 'generated' || c.status === 'distributed').length;
@@ -1230,28 +1344,44 @@ function EbookReader() {
     dispatch({ type: 'UPDATE_PROGRESS', payload: { userId: user.id, bookId, currentChapter, currentPage: 1, percentComplete: Math.min(chapterProgress, 100), lastReadAt: new Date().toISOString(), totalReadTime: (state.progress.find(p => p.userId === user.id && p.bookId === bookId)?.totalReadTime || 0) + 60 } });
   }, [currentChapter, bookId]);
 
-  // Register device on first read
+  // Register device on first read and enforce limits
+  const deviceFp = 'device-fp-' + (navigator.userAgent || 'unknown').slice(0, 20).replace(/\s/g, '-').toLowerCase();
+  const userDevices = state.devices.filter(d => d.userId === user.id);
+  const entitlementDevices = entitlement ? state.devices.filter(d => entitlement.registeredDevices.includes(d.deviceFingerprint)) : [];
+  const deviceLimitReached = entitlement ? (entitlement.registeredDevices.length >= entitlement.maxDevices && !entitlement.registeredDevices.includes(deviceFp)) : false;
+
   useEffect(() => {
-    if (!entitlement || !bookId) return;
-    const fp = 'device-fp-' + (navigator.userAgent || 'unknown').slice(0, 20).replace(/\s/g, '-').toLowerCase();
-    const existing = state.devices.find(d => d.deviceFingerprint === fp && d.userId === user.id);
-    if (!existing && entitlement.registeredDevices.length < entitlement.maxDevices) {
-      const device = { id: uuidv4(), userId: user.id, deviceFingerprint: fp, deviceName: `${navigator.platform || 'Unknown'} browser`, registeredAt: new Date().toISOString(), lastUsedAt: new Date().toISOString() };
+    if (!entitlement || !bookId || deviceLimitReached) return;
+    const existing = state.devices.find(d => d.deviceFingerprint === deviceFp && d.userId === user.id);
+    if (!existing) {
+      const device = { id: uuidv4(), userId: user.id, deviceFingerprint: deviceFp, deviceName: `${navigator.platform || 'Unknown'} browser`, registeredAt: new Date().toISOString(), lastUsedAt: new Date().toISOString() };
       dispatch({ type: 'REGISTER_DEVICE', payload: device });
     }
   }, [bookId]);
 
   // Prevent print and download
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 's')) { e.preventDefault(); } };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 's' || e.key === 'P' || e.key === 'S')) { e.preventDefault(); }
+    };
     const handleContextMenu = (e: MouseEvent) => { e.preventDefault(); };
+    const handleBeforePrint = (e: Event) => { e.preventDefault(); };
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('contextmenu', handleContextMenu);
-    return () => { document.removeEventListener('keydown', handleKeyDown); document.removeEventListener('contextmenu', handleContextMenu); };
+    window.addEventListener('beforeprint', handleBeforePrint);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('beforeprint', handleBeforePrint);
+    };
   }, []);
 
   if (!book || !entitlement) {
     return (<div className="min-h-screen flex items-center justify-center"><div className="text-center"><AlertCircle className="w-16 h-16 text-helix-danger mx-auto mb-4" /><h2 className="text-xl font-bold mb-2">Access Denied</h2><p className="text-helix-muted mb-4">You don't have access to this book or your entitlement has expired.</p><button onClick={() => navigate('/student')} className="px-6 py-2.5 bg-helix-primary text-white rounded-xl text-sm font-medium">Back to Bookshelf</button></div></div>);
+  }
+
+  if (deviceLimitReached) {
+    return (<div className="min-h-screen flex items-center justify-center"><div className="text-center max-w-md"><Smartphone className="w-16 h-16 text-helix-warning mx-auto mb-4" /><h2 className="text-xl font-bold mb-2">Device Limit Reached</h2><p className="text-helix-muted mb-2">This book can only be used on {entitlement.maxDevices} device{entitlement.maxDevices > 1 ? 's' : ''}.</p><p className="text-sm text-helix-muted mb-4">You have already registered {entitlement.registeredDevices.length} device{entitlement.registeredDevices.length > 1 ? 's' : ''}. Remove a device from your account settings to read on this device.</p><div className="flex gap-3 justify-center"><button onClick={() => navigate('/student/devices')} className="px-4 py-2 bg-helix-primary text-white rounded-xl text-sm font-medium">Manage Devices</button><button onClick={() => navigate('/student')} className="px-4 py-2 bg-helix-card text-helix-text rounded-xl text-sm">Back</button></div></div></div>);
   }
 
   const bookmarks = state.bookmarks.filter(b => b.userId === user.id && b.bookId === bookId);
@@ -1292,7 +1422,7 @@ function EbookReader() {
         </div>
       )}
       <main className="flex-1 pt-14 pb-20">
-        <article className="max-w-2xl mx-auto px-6 py-10 select-none" style={{ userSelect: 'none' }}>
+        <article className="max-w-2xl mx-auto px-6 py-10 select-none reader-protected" style={{ userSelect: 'none' }}>
           <div className="mb-8"><p className="text-xs text-helix-primary font-medium uppercase tracking-wider mb-2">Chapter {currentChapter + 1} of {content.chapters.length}</p><h1 className="text-2xl sm:text-3xl font-bold">{chapter?.title}</h1></div>
           <div className="reader-content" style={{ fontSize: `${fontSize}px` }}>
             {paragraphs.map((para, i) => {
