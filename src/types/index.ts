@@ -1,4 +1,6 @@
-export type UserRole = 'super_admin' | 'partner_admin' | 'student';
+export type UserRole = 'super_admin' | 'partner_admin' | 'support_agent' | 'student';
+
+export type UserStatus = 'active' | 'suspended' | 'deactivated';
 
 export interface User {
   id: string;
@@ -6,9 +8,12 @@ export interface User {
   name: string;
   role: UserRole;
   partnerId?: string;
+  status: UserStatus;
   avatar?: string;
   createdAt: string;
   lastLogin?: string;
+  passwordResetToken?: string;
+  passwordResetExpiry?: string;
 }
 
 export interface LearningPartner {
@@ -60,9 +65,55 @@ export interface Book {
   updatedAt: string;
 }
 
+export type OrderStatus = 'draft' | 'submitted' | 'approved' | 'processing' | 'fulfilled' | 'cancelled';
+export type ValidityPreset = 30 | 90 | 180 | 365 | 'custom';
+
+export interface Order {
+  id: string;
+  orderId: string; // LP-entered order ID
+  partnerId: string;
+  bookId: string;
+  quantity: number;
+  validityDays: number;
+  maxDevices: number;
+  status: OrderStatus;
+  requestedBy: string;
+  orderDate: string;
+  fulfilledAt?: string;
+  fulfilledBy?: string;
+  fulfillmentNotes?: string;
+  customerNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CodeStatus = 'generated' | 'distributed' | 'redeemed' | 'expired' | 'revoked' | 'exhausted';
+
+export interface AccessCode {
+  id: string;
+  code: string;
+  orderId: string;
+  batchId?: string;
+  bookId: string;
+  partnerId: string;
+  classroomId?: string;
+  status: CodeStatus;
+  validityDays: number;
+  maxDevices: number;
+  redeemedBy?: string;
+  redeemedAt?: string;
+  expiresAt?: string;
+  revokedAt?: string;
+  revokedBy?: string;
+  revokeReason?: string;
+  createdAt: string;
+  createdBy?: string;
+}
+
 export interface AccessCodeBatch {
   id: string;
   name: string;
+  orderId?: string;
   partnerId?: string;
   bookId: string;
   codeCount: number;
@@ -70,20 +121,6 @@ export interface AccessCodeBatch {
   codesRedeemed: number;
   status: 'active' | 'exhausted' | 'expired';
   expirationDate?: string;
-  createdAt: string;
-}
-
-export interface AccessCode {
-  id: string;
-  code: string;
-  batchId: string;
-  bookId: string;
-  partnerId?: string;
-  classroomId?: string;
-  status: 'unused' | 'redeemed' | 'expired' | 'revoked';
-  redeemedBy?: string;
-  redeemedAt?: string;
-  expiresAt?: string;
   createdAt: string;
 }
 
@@ -95,6 +132,17 @@ export interface BookEntitlement {
   grantedAt: string;
   expiresAt?: string;
   revoked: boolean;
+  maxDevices: number;
+  registeredDevices: string[];
+}
+
+export interface RegisteredDevice {
+  id: string;
+  userId: string;
+  deviceFingerprint: string;
+  deviceName: string;
+  registeredAt: string;
+  lastUsedAt: string;
 }
 
 export interface ReadingProgress {
@@ -141,6 +189,16 @@ export interface AuditLogEntry {
   createdAt: string;
 }
 
+export interface ExportRecord {
+  id: string;
+  orderId: string;
+  exportedBy: string;
+  exportedAt: string;
+  format: 'csv';
+  recordCount: number;
+  downloadUrl?: string;
+}
+
 export interface DashboardStats {
   totalPartners: number;
   activePartners: number;
@@ -152,4 +210,7 @@ export interface DashboardStats {
   redeemedCodes: number;
   totalClassrooms: number;
   activeClassrooms: number;
+  totalOrders: number;
+  pendingOrders: number;
+  fulfilledOrders: number;
 }
