@@ -5,6 +5,9 @@ import { useState, useEffect } from 'react';
 import type { UserRole, Order, OrderStatus, CodeStatus, Book, User, AccessCode, BookEntitlement } from './types';
 import { AdminDashboard, UserManagement, PartnerManagement, PartnerEmails } from './pages/AdminPages';
 import { RolesPermissions } from './pages/RolesPermissions';
+import { OrdersList } from './pages/OrdersList';
+import { OrderCreateForm } from './pages/OrderCreateForm';
+import { OrderDetails } from './pages/OrderDetails';
 import {
   BookOpen, Users, GraduationCap, Shield, Settings, LogOut, Home, Library,
   Key, BarChart3, FileText, Search, Plus, Edit, Trash2, Eye,
@@ -407,13 +410,50 @@ function PartnerOrders() {
   const { state, dispatch, createOrder } = useApp();
   const user = state.currentUser!;
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ orderId: '', bookId: '', quantity: 10, validityDays: 90, maxDevices: 2 });
+  const [form, setForm] = useState({ orderId: '', bookId: '', quantity: 10, validityDays: 90, maxDevices: 2, validityType: 'upon_activation' as 'upon_activation' | 'valid_until_date', validityDuration: 90, validityDurationUnit: 'days' as 'days' | 'months' | 'years', validUntilDate: '' });
   const partnerOrders = state.orders.filter(o => o.partnerId === user.partnerId);
   const approvedBooks = state.books.filter(b => b.approvedPartners.includes(user.partnerId!) && b.status === 'published');
   const handleSubmit = async () => {
     if (!form.orderId || !form.bookId) { dispatch({ type: 'ADD_NOTIFICATION', payload: { message: 'Fill all required fields', type: 'error' } }); return; }
-    const result = await createOrder({ orderId: form.orderId, partnerId: user.partnerId!, bookId: form.bookId, quantity: form.quantity, validityDays: form.validityDays, maxDevices: form.maxDevices, status: 'submitted', requestedBy: user.id, orderDate: new Date().toISOString() });
-    if (result.success) { dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Order ${form.orderId} submitted`, type: 'success' } }); setShowForm(false); setForm({ orderId: '', bookId: '', quantity: 10, validityDays: 90, maxDevices: 2 }); }
+    
+    // Validate validity options
+    if (form.validityType === 'upon_activation' && (!form.validityDuration || form.validityDuration < 1)) {
+      dispatch({ type: 'ADD_NOTIFICATION', payload: { message: 'Please enter a valid duration', type: 'error' } });
+      return;
+    }
+    if (form.validityType === 'valid_until_date' && !form.validUntilDate) {
+      dispatch({ type: 'ADD_NOTIFICATION', payload: { message: 'Please select a valid until date', type: 'error' } });
+      return;
+    }
+    if (form.validityType === 'valid_until_date' && new Date(form.validUntilDate) <= new Date()) {
+      dispatch({ type: 'ADD_NOTIFICATION', payload: { message: 'Valid until date must be in the future', type: 'error' } });
+      return;
+    }
+    
+    const result = await createOrder({ 
+      orderId: form.orderId, 
+      partnerId: user.partnerId!, 
+      bookId: form.bookId, 
+      quantity: form.quantity, 
+      validityDays: form.validityDays, 
+      maxDevices: form.maxDevices, 
+      status: 'submitted', 
+      requestedBy: user.id, 
+      orderDate: new Date().toISOString(),
+      validityType: form.validityType,
+      ...(form.validityType === 'upon_activation' && {
+        validityDuration: form.validityDuration,
+        validityDurationUnit: form.validityDurationUnit
+      }),
+      ...(form.validityType === 'valid_until_date' && {
+        validUntilDate: form.validUntilDate
+      })
+    });
+    if (result.success) { 
+      dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Order ${form.orderId} submitted`, type: 'success' } }); 
+      setShowForm(false); 
+      setForm({ orderId: '', bookId: '', quantity: 10, validityDays: 90, maxDevices: 2, validityType: 'upon_activation', validityDuration: 90, validityDurationUnit: 'days', validUntilDate: '' }); 
+    }
     else dispatch({ type: 'ADD_NOTIFICATION', payload: { message: result.error || 'Failed', type: 'error' } });
   };
   return (
@@ -873,14 +913,18 @@ export default function App() {
           <Route path="/admin/roles" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><RolesPermissions /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/partners" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><PartnerManagement /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/emails" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><PartnerEmails /></AppLayout></ProtectedRoute>} />
-          <Route path="/admin/orders" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminOrdersPlaceholder /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/orders" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><OrdersList /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/orders/new" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><OrderCreateForm /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/orders/:orderId" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><OrderDetails /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/codes" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminCodesPlaceholder /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/books" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminBooksPlaceholder /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminReportsPlaceholder /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/audit" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminAuditPlaceholder /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminSettingsPlaceholder /></AppLayout></ProtectedRoute>} />
           <Route path="/support" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><SupportDashboard /></AppLayout></ProtectedRoute>} />
-          <Route path="/support/orders" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><SupportOrders /></AppLayout></ProtectedRoute>} />
+          <Route path="/support/orders" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><OrdersList /></AppLayout></ProtectedRoute>} />
+          <Route path="/support/orders/new" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><OrderCreateForm /></AppLayout></ProtectedRoute>} />
+          <Route path="/support/orders/:orderId" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><OrderDetails /></AppLayout></ProtectedRoute>} />
           <Route path="/support/codes" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><SupportCodes /></AppLayout></ProtectedRoute>} />
           <Route path="/support/exports" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><SupportExports /></AppLayout></ProtectedRoute>} />
           <Route path="/partner" element={<ProtectedRoute allowedRoles={['partner_admin']}><AppLayout role="partner_admin"><PartnerDashboard /></AppLayout></ProtectedRoute>} />
