@@ -12,7 +12,7 @@ export function OrderDetails() {
 
   const order = state.orders.find(o => o.id === orderId);
   const partner = order ? state.partners.find(p => p.id === order.partnerId) : null;
-  const book = order ? state.books.find(b => b.id === order.bookId) : null;
+  const courseware = order ? state.courseware.find(c => c.id === order.bookId) : null;
   const codes = state.codes.filter(c => c.orderId === orderId);
 
   const filteredCodes = codes.filter(code => {
@@ -127,8 +127,8 @@ export function OrderDetails() {
             </div>
             <div>
               <p className="text-sm text-helix-muted">Book</p>
-              <p className="font-medium">{book?.title || 'Unknown'}</p>
-              {book?.isbn && <p className="text-xs text-helix-muted">ISBN: {book.isbn}</p>}
+              <p className="font-medium">{courseware?.title || 'Unknown'}</p>
+              {courseware?.isbn13 && <p className="text-xs text-helix-muted">ISBN: {courseware.isbn13}</p>}
             </div>
             <div>
               <p className="text-sm text-helix-muted">Created By</p>
