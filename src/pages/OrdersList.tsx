@@ -20,7 +20,7 @@ export function OrdersList() {
     const matchesSearch = !search || 
       order.orderId.toLowerCase().includes(search.toLowerCase()) ||
       state.partners.find(p => p.id === order.partnerId)?.name.toLowerCase().includes(search.toLowerCase()) ||
-      state.books.find(b => b.id === order.bookId)?.title.toLowerCase().includes(search.toLowerCase());
+      state.courseware.find(c => c.id === order.bookId)?.title.toLowerCase().includes(search.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     const matchesPartner = partnerFilter === 'all' || order.partnerId === partnerFilter;
@@ -130,7 +130,7 @@ export function OrdersList() {
             <tbody className="divide-y divide-helix-border">
               {filteredOrders.map(order => {
                 const partner = state.partners.find(p => p.id === order.partnerId);
-                const book = state.books.find(b => b.id === order.bookId);
+                const courseware = state.courseware.find(c => c.id === order.bookId);
                 const stats = getCodeStats(order.id);
                 
                 return (
@@ -147,7 +147,7 @@ export function OrdersList() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <BookOpen className="w-4 h-4 text-helix-muted" />
-                        <span className="text-sm">{book?.title || 'Unknown'}</span>
+                        <span className="text-sm">{courseware?.title || 'Unknown'}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
