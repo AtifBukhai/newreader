@@ -95,8 +95,8 @@ interface AppContextType {
   dispatch: React.Dispatch<Action>;
   getBookContent: (bookId: string) => { chapters: { title: string; content: string }[] };
   // Service-backed operations
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string; data?: User }>;
+  signUp: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string; data?: User }>;
   signOut: () => Promise<void>;
   createOrder: (order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; error?: string; data?: Order }>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<{ success: boolean; error?: string }>;
@@ -258,7 +258,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Don't call syncFromService here - the service notification will handle it
       console.log('[Kitabo Store] LOGIN dispatched, waiting for service notification');
     }
-    return { success: result.success, error: result.error };
+    return { success: result.success, error: result.error, data: result.data };
   };
 
   const signUp = async (email: string, password: string, name: string) => {
@@ -270,7 +270,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Don't call syncFromService here - the service notification will handle it
       console.log('[Kitabo Store] LOGIN dispatched, waiting for service notification');
     }
-    return { success: result.success, error: result.error };
+    return { success: result.success, error: result.error, data: result.data };
   };
 
   const signOut = async () => {
