@@ -18,7 +18,8 @@ import type {
   User, UserRole, UserStatus, LearningPartner, Book, Order, OrderStatus,
   AccessCode, CodeStatus, AccessCodeBatch, BookEntitlement, ReadingProgress,
   Bookmark, Highlight, AuditLogEntry, RegisteredDevice, ExportRecord, Classroom,
-  PartnerEmail, RolePermission, PermissionModule, PermissionAction
+  PartnerEmail, RolePermission, PermissionModule, PermissionAction,
+  Publisher, Courseware, Category, Subject
 } from '../types';
 
 // ============================================
@@ -51,6 +52,11 @@ interface DemoState {
   highlights: Highlight[];
   auditLogs: AuditLogEntry[];
   exports: ExportRecord[];
+  // Courseware Management
+  publishers: Publisher[];
+  courseware: Courseware[];
+  categories: Category[];
+  subjects: Subject[];
 }
 
 // Cryptographically secure code generation
@@ -177,6 +183,23 @@ function createDemoState(): DemoState {
       // Student - minimal permissions
       { id: 'rp-43', role: 'student', module: 'books', action: 'view', enabled: true },
       { id: 'rp-44', role: 'student', module: 'codes', action: 'view', enabled: true },
+    ],
+    // Courseware Management - Initial Data
+    publishers: [
+      { id: 'pub-1', name: 'TechPress', identifier: 'techpress', description: 'Leading technology publisher', website: 'https://techpress.example.com', contactEmail: 'contact@techpress.example.com', status: 'active', createdAt: '2023-01-01T10:00:00Z', updatedAt: '2023-01-01T10:00:00Z' },
+      { id: 'pub-2', name: 'BusinessEdge', identifier: 'businessedge', description: 'Business and management publications', website: 'https://businessedge.example.com', contactEmail: 'info@businessedge.example.com', status: 'active', createdAt: '2023-02-01T10:00:00Z', updatedAt: '2023-02-01T10:00:00Z' },
+    ],
+    courseware: [],
+    categories: [
+      { id: 'cat-1', name: 'Computer Science', description: 'Computer science and programming courses', createdAt: '2023-01-01T10:00:00Z' },
+      { id: 'cat-2', name: 'Mathematics', description: 'Mathematics and statistics courses', createdAt: '2023-01-01T10:00:00Z' },
+      { id: 'cat-3', name: 'Business', description: 'Business and management courses', createdAt: '2023-01-01T10:00:00Z' },
+      { id: 'cat-4', name: 'Marketing', description: 'Marketing and sales courses', createdAt: '2023-01-01T10:00:00Z' },
+    ],
+    subjects: [
+      { id: 'sub-1', name: 'Programming', description: 'Programming and software development', createdAt: '2023-01-01T10:00:00Z' },
+      { id: 'sub-2', name: 'Data Science', description: 'Data science and analytics', createdAt: '2023-01-01T10:00:00Z' },
+      { id: 'sub-3', name: 'Algorithms', description: 'Algorithms and data structures', createdAt: '2023-01-01T10:00:00Z' },
     ],
   };
 }
@@ -336,6 +359,194 @@ class KitaboService {
 
   getClassrooms(): Classroom[] {
     return this.demoState?.classrooms || [];
+  }
+
+  getPublishers(): Publisher[] {
+    return this.demoState?.publishers || [];
+  }
+
+  getCourseware(): Courseware[] {
+    return this.demoState?.courseware || [];;
+  }
+
+  getCategories(): Category[] {
+    return this.demoState?.categories || [];
+  }
+
+  getSubjects(): Subject[] {
+    return this.demoState?.subjects || [];
+  }
+
+  // ============================================
+  // PUBLISHER MANAGEMENT
+  // ============================================
+  async createPublisher(data: Omit<Publisher, 'id' | 'createdAt' | 'updatedAt'>, actorId: string): Promise<ServiceResult<Publisher>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    // Validate required fields
+    if (!data.name || data.name.trim().length === 0) {
+      return { success: false, error: 'Publisher name is required' };
+    }
+
+    // Check for duplicate name
+    if (this.demoState!.publishers.find(p => p.name.toLowerCase() === data.name.toLowerCase())) {
+      return { success: false, error: 'Publisher with this name already exists' };
+    }
+
+    const newPublisher: Publisher = {
+      ...data,
+      id: generateId(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.demoState!.publishers.push(newPublisher);
+    this.addAuditLog(actorId, 'publisher.created', 'Publisher', newPublisher.id, `Created publisher ${newPublisher.name}`);
+    this.notify();
+    return { success: true, data: newPublisher };
+  }
+
+  async updatePublisher(publisherId: string, updates: Partial<Publisher>, actorId: string): Promise<ServiceResult<Publisher>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    const publisher = this.demoState!.publishers.find(p => p.id === publisherId);
+    if (!publisher) return { success: false, error: 'Publisher not found' };
+
+    // Check for duplicate name if name is being changed
+    if (updates.name && updates.name !== publisher.name) {
+      if (this.demoState!.publishers.find(p => p.name.toLowerCase() === updates.name!.toLowerCase() && p.id !== publisherId)) {
+        return { success: false, error: 'Publisher with this name already exists' };
+      }
+    }
+
+    const updated: Publisher = { ...publisher, ...updates, id: publisherId, updatedAt: new Date().toISOString() };
+    this.demoState!.publishers = this.demoState!.publishers.map(p => p.id === publisherId ? updated : p);
+    
+    this.addAuditLog(actorId, 'publisher.updated', 'Publisher', publisherId, `Updated publisher ${updated.name}`);
+    this.notify();
+    return { success: true, data: updated };
+  }
+
+  // ============================================
+  // COURSEWARE MANAGEMENT
+  // ============================================
+  async uploadCourseware(file: File, metadata: Partial<Courseware>, actorId: string): Promise<ServiceResult<Courseware>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    // Validate file
+    if (!file || file.size === 0) {
+      return { success: false, error: 'Invalid file' };
+    }
+
+    // Detect file format
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    let fileFormat: 'epub' | 'pdf' | 'unknown' = 'unknown';
+    if (extension === 'epub') fileFormat = 'epub';
+    else if (extension === 'pdf') fileFormat = 'pdf';
+    else return { success: false, error: 'Unsupported file format. Only EPUB and PDF are supported.' };
+
+    // Check file size (500MB limit)
+    const maxSize = 500 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return { success: false, error: `File size exceeds maximum limit of 500MB` };
+    }
+
+    // Calculate file hash (simulated for demo)
+    const fileHash = `hash_${generateId()}`;
+
+    // Check for duplicates
+    const existingByHash = this.demoState!.courseware.find(c => c.fileHash === fileHash);
+    if (existingByHash) {
+      return { success: false, error: 'Duplicate file detected. This file has already been uploaded.' };
+    }
+
+    // Create courseware record
+    const newCourseware: Courseware = {
+      id: generateId(),
+      fileFormat,
+      fileSize: file.size,
+      fileHash,
+      storagePath: `courseware/${actorId}/${Date.now()}_${file.name}`,
+      originalFilename: file.name,
+      title: metadata.title || file.name.replace(/\.[^/.]+$/, ''),
+      author: metadata.author || 'Unknown',
+      language: metadata.language || 'English',
+      tags: metadata.tags || [],
+      version: '1.0.0',
+      isLatestVersion: true,
+      status: 'awaiting_review',
+      rightsStatus: 'pending',
+      uploadedBy: actorId,
+      uploadedAt: new Date().toISOString(),
+      metadataComplete: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...metadata,
+    };
+
+    this.demoState!.courseware.push(newCourseware);
+    this.addAuditLog(actorId, 'courseware.uploaded', 'Courseware', newCourseware.id, `Uploaded courseware: ${newCourseware.title} (${file.name})`);
+    this.notify();
+    return { success: true, data: newCourseware };
+  }
+
+  async updateCourseware(coursewareId: string, updates: Partial<Courseware>, actorId: string): Promise<ServiceResult<Courseware>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    const courseware = this.demoState!.courseware.find(c => c.id === coursewareId);
+    if (!courseware) return { success: false, error: 'Courseware not found' };
+
+    const updated: Courseware = { ...courseware, ...updates, id: coursewareId, updatedAt: new Date().toISOString() };
+    this.demoState!.courseware = this.demoState!.courseware.map(c => c.id === coursewareId ? updated : c);
+    
+    this.addAuditLog(actorId, 'courseware.updated', 'Courseware', coursewareId, `Updated courseware: ${updated.title}`);
+    this.notify();
+    return { success: true, data: updated };
+  }
+
+  async publishCourseware(coursewareId: string, actorId: string): Promise<ServiceResult<Courseware>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    const courseware = this.demoState!.courseware.find(c => c.id === coursewareId);
+    if (!courseware) return { success: false, error: 'Courseware not found' };
+
+    // Check if metadata is complete
+    if (!courseware.metadataComplete) {
+      return { success: false, error: 'Metadata must be complete before publishing' };
+    }
+
+    // Check if rights are approved
+    if (courseware.rightsStatus !== 'approved') {
+      return { success: false, error: 'Publisher rights must be approved before publishing' };
+    }
+
+    const updated: Courseware = {
+      ...courseware,
+      status: 'published',
+      publishedAt: new Date().toISOString(),
+      publishedBy: actorId,
+      updatedAt: new Date().toISOString(),
+    };
+    this.demoState!.courseware = this.demoState!.courseware.map(c => c.id === coursewareId ? updated : c);
+    
+    this.addAuditLog(actorId, 'courseware.published', 'Courseware', coursewareId, `Published courseware: ${updated.title}`);
+    this.notify();
+    return { success: true, data: updated };
   }
 
   // ============================================
