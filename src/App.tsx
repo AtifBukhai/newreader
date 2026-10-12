@@ -38,16 +38,34 @@ function AuthPage() {
     try {
       if (isLogin) {
         const result = await signIn(email, password);
-        if (result.success) {
-          navigate('/');
+        if (result.success && result.data) {
+          // Navigate directly to the correct dashboard based on user role
+          const roleRoutes: Record<string, string> = {
+            super_admin: '/admin',
+            support_agent: '/support',
+            partner_admin: '/partner',
+            student: '/student'
+          };
+          const dashboardRoute = roleRoutes[result.data.role] || '/student';
+          console.log('[AuthPage] Login successful, navigating to:', dashboardRoute);
+          navigate(dashboardRoute, { replace: true });
         } else {
           setError(result.error || 'Login failed');
         }
       } else {
         if (!name || !email) { setError('Please fill all fields'); setLoading(false); return; }
         const result = await signUp(email, password, name);
-        if (result.success) {
-          navigate('/');
+        if (result.success && result.data) {
+          // Navigate directly to the correct dashboard based on user role
+          const roleRoutes: Record<string, string> = {
+            super_admin: '/admin',
+            support_agent: '/support',
+            partner_admin: '/partner',
+            student: '/student'
+          };
+          const dashboardRoute = roleRoutes[result.data.role] || '/student';
+          console.log('[AuthPage] Signup successful, navigating to:', dashboardRoute);
+          navigate(dashboardRoute, { replace: true });
         } else {
           setError(result.error || 'Signup failed');
         }
