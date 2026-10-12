@@ -75,11 +75,6 @@ function AuthPage() {
             <h1 className="text-3xl font-bold gradient-text">Kitabo</h1>
           </div>
           <p className="text-helix-muted">Corporate eBook Distribution Platform</p>
-          {state.isDemoMode && (
-            <p className="text-xs text-helix-warning mt-2 bg-helix-warning/10 rounded-lg px-3 py-1 inline-block">
-              ⚠ Demo Mode — Data is not persisted
-            </p>
-          )}
         </div>
         <div className="glass rounded-2xl p-8 glow">
           <h2 className="text-xl font-semibold mb-6">{isLogin ? 'Sign In' : 'Create Account'}</h2>
@@ -264,317 +259,9 @@ function ConfirmDialog({ open, title, message, onConfirm, onCancel, danger = fal
   );
 }
 
-// ==================== SUPER ADMIN PAGES ====================
-function SuperAdminDashboard() {
-  const { state } = useApp();
-  const chartData = [
-    { month: 'Jul', students: 120, codes: 200 }, { month: 'Aug', students: 280, codes: 450 },
-    { month: 'Sep', students: 450, codes: 680 }, { month: 'Oct', students: state.users.filter(u => u.role === 'student').length, codes: state.codes.length },
-  ];
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div><h1 className="text-2xl font-bold">Platform Dashboard</h1><p className="text-helix-muted mt-1">Overview of platform activity</p></div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Globe} label="Partners" value={state.partners.length} color="primary" />
-        <StatCard icon={Library} label="Books" value={state.books.filter(b => b.status === 'published').length} color="accent" />
-        <StatCard icon={Users} label="Students" value={state.users.filter(u => u.role === 'student').length} color="success" />
-        <StatCard icon={ShoppingCart} label="Orders" value={state.orders.length} color="warning" />
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="glass rounded-xl p-6">
-          <h3 className="font-semibold mb-4">Platform Growth</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={chartData}><CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" /><XAxis dataKey="month" stroke="#8888a0" fontSize={12} /><YAxis stroke="#8888a0" fontSize={12} /><Tooltip contentStyle={{ background: '#1a1a2e', border: '1px solid #2a2a3e', borderRadius: '8px' }} /><Area type="monotone" dataKey="students" stroke="#6c5ce7" fill="#6c5ce7" fillOpacity={0.1} /><Area type="monotone" dataKey="codes" stroke="#00cec9" fill="#00cec9" fillOpacity={0.1} /></AreaChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="glass rounded-xl p-6">
-          <h3 className="font-semibold mb-4">Recent Activity</h3>
-          <div className="space-y-3">{state.auditLogs.slice(0, 6).map(log => (
-            <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-helix-bg/50">
-              <div className="w-8 h-8 rounded-full bg-helix-primary/20 flex items-center justify-center flex-shrink-0"><Zap className="w-4 h-4 text-helix-primary" /></div>
-              <div className="min-w-0"><p className="text-sm truncate">{log.details}</p><p className="text-xs text-helix-muted mt-0.5">{new Date(log.createdAt).toLocaleDateString()}</p></div>
-            </div>
-          ))}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function AdminOrders() {
-  const { state, dispatch, updateOrderStatus } = useApp();
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [search, setSearch] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [confirmCancel, setConfirmCancel] = useState<Order | null>(null);
-  const filtered = state.orders.filter(o => (statusFilter === 'all' || o.status === statusFilter) && (o.orderId.toLowerCase().includes(search.toLowerCase()) || state.partners.find(p => p.id === o.partnerId)?.name.toLowerCase().includes(search.toLowerCase())));
-  const handleApprove = async (order: Order) => {
-    const result = await updateOrderStatus(order.id, 'approved');
-    if (result.success) dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Order ${order.orderId} approved`, type: 'success' } });
-    else dispatch({ type: 'ADD_NOTIFICATION', payload: { message: result.error || 'Failed', type: 'error' } });
-    setSelectedOrder(null);
-  };
-  const handleCancel = async (order: Order) => {
-    const result = await updateOrderStatus(order.id, 'cancelled');
-    if (result.success) dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Order ${order.orderId} cancelled`, type: 'success' } });
-    setConfirmCancel(null); setSelectedOrder(null);
-  };
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div><h1 className="text-2xl font-bold">Orders</h1><p className="text-helix-muted mt-1">Manage all platform orders</p></div>
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <StatCard icon={ClipboardList} label="Total" value={state.orders.length} color="primary" />
-        <StatCard icon={Clock} label="Pending" value={state.orders.filter(o => o.status === 'submitted' || o.status === 'approved').length} color="warning" />
-        <StatCard icon={Package} label="Processing" value={state.orders.filter(o => o.status === 'processing').length} color="accent" />
-        <StatCard icon={Check} label="Fulfilled" value={state.orders.filter(o => o.status === 'fulfilled').length} color="success" />
-        <StatCard icon={AlertTriangle} label="Cancelled" value={state.orders.filter(o => o.status === 'cancelled').length} color="warning" />
-      </div>
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-helix-muted" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search orders..." className="w-full pl-10 pr-4 py-2.5 bg-helix-surface border border-helix-border rounded-xl text-sm focus:border-helix-primary focus:outline-none" /></div>
-        <div className="flex gap-2 flex-wrap">{['all', 'submitted', 'approved', 'processing', 'fulfilled', 'cancelled'].map(s => (<button key={s} onClick={() => setStatusFilter(s)} className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${statusFilter === s ? 'bg-helix-primary text-white' : 'bg-helix-card text-helix-muted hover:text-helix-text'}`}>{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>))}</div>
-      </div>
-      <div className="glass rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-helix-bg/50"><tr><th className="text-left px-4 py-3 text-helix-muted font-medium">Order ID</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Partner</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Book</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Qty</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Status</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Actions</th></tr></thead>
-            <tbody>{filtered.map(o => (
-              <tr key={o.id} className="border-t border-helix-border hover:bg-helix-bg/30">
-                <td className="px-4 py-3 font-mono text-xs font-medium">{o.orderId}</td>
-                <td className="px-4 py-3 text-helix-muted text-xs">{state.partners.find(p => p.id === o.partnerId)?.name}</td>
-                <td className="px-4 py-3 text-xs">{state.books.find(b => b.id === o.bookId)?.title}</td>
-                <td className="px-4 py-3">{o.quantity}</td>
-                <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
-                <td className="px-4 py-3"><div className="flex gap-2">
-                  <button onClick={() => setSelectedOrder(o)} className="text-helix-primary text-xs flex items-center gap-1"><Eye className="w-3 h-3" /> View</button>
-                  {o.status === 'submitted' && <button onClick={() => handleApprove(o)} className="text-helix-success text-xs">Approve</button>}
-                  {(o.status === 'submitted' || o.status === 'approved') && <button onClick={() => setConfirmCancel(o)} className="text-helix-danger text-xs">Cancel</button>}
-                </div></td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
-      </div>
-      {selectedOrder && (
-        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4" onClick={() => setSelectedOrder(null)}>
-          <div className="glass rounded-xl p-6 max-w-lg w-full animate-fade-in" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold mb-4">Order: {selectedOrder.orderId}</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-helix-muted">Partner:</span><span>{state.partners.find(p => p.id === selectedOrder.partnerId)?.name}</span></div>
-              <div className="flex justify-between"><span className="text-helix-muted">Book:</span><span>{state.books.find(b => b.id === selectedOrder.bookId)?.title}</span></div>
-              <div className="flex justify-between"><span className="text-helix-muted">Quantity:</span><span className="font-bold text-helix-primary">{selectedOrder.quantity}</span></div>
-              <div className="flex justify-between"><span className="text-helix-muted">Validity:</span><span>{selectedOrder.validityDays} days</span></div>
-              <div className="flex justify-between"><span className="text-helix-muted">Max Devices:</span><span>{selectedOrder.maxDevices}</span></div>
-              <div className="flex justify-between"><span className="text-helix-muted">Status:</span><StatusBadge status={selectedOrder.status} /></div>
-            </div>
-            <div className="flex gap-2 justify-end mt-6">
-              {selectedOrder.status === 'submitted' && <button onClick={() => handleApprove(selectedOrder)} className="px-4 py-2 bg-helix-success text-white rounded-lg text-sm font-medium">Approve</button>}
-              <button onClick={() => setSelectedOrder(null)} className="px-4 py-2 bg-helix-card rounded-lg text-sm">Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-      <ConfirmDialog open={!!confirmCancel} title="Cancel Order" message={`Cancel order ${confirmCancel?.orderId}?`} onConfirm={() => confirmCancel && handleCancel(confirmCancel)} onCancel={() => setConfirmCancel(null)} danger />
-    </div>
-  );
-}
 
-function AdminCodes() {
-  const { state, dispatch, revokeCode } = useApp();
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const filtered = state.codes.filter(c => {
-    const matchStatus = statusFilter === 'all' || c.status === statusFilter;
-    const q = search.toLowerCase();
-    const matchSearch = !q || c.code.toLowerCase().includes(q) || state.orders.find(o => o.id === c.orderId)?.orderId.includes(q) || state.books.find(b => b.id === c.bookId)?.title.toLowerCase().includes(q);
-    return matchStatus && matchSearch;
-  });
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div><h1 className="text-2xl font-bold">Access Codes</h1><p className="text-helix-muted mt-1">Search and manage all access codes</p></div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard icon={Key} label="Total" value={state.codes.length} color="primary" />
-        <StatCard icon={Check} label="Redeemed" value={state.codes.filter(c => c.status === 'redeemed').length} color="success" />
-        <StatCard icon={Package} label="Available" value={state.codes.filter(c => c.status === 'generated' || c.status === 'distributed').length} color="accent" />
-        <StatCard icon={AlertTriangle} label="Revoked" value={state.codes.filter(c => c.status === 'revoked').length} color="warning" />
-      </div>
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-helix-muted" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search code, order ID, book..." className="w-full pl-10 pr-4 py-2.5 bg-helix-surface border border-helix-border rounded-xl text-sm focus:border-helix-primary focus:outline-none" /></div>
-        <div className="flex gap-2 flex-wrap">{['all', 'generated', 'distributed', 'redeemed', 'expired', 'revoked'].map(s => (<button key={s} onClick={() => setStatusFilter(s)} className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${statusFilter === s ? 'bg-helix-primary text-white' : 'bg-helix-card text-helix-muted hover:text-helix-text'}`}>{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>))}</div>
-      </div>
-      <div className="glass rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-helix-bg/50"><tr><th className="text-left px-4 py-3 text-helix-muted font-medium">Code</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Order</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Book</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Status</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Actions</th></tr></thead>
-            <tbody>{filtered.slice(0, 50).map(c => (
-              <tr key={c.id} className="border-t border-helix-border hover:bg-helix-bg/30">
-                <td className="px-4 py-3 font-mono text-xs">{c.code}</td>
-                <td className="px-4 py-3 font-mono text-xs text-helix-muted">{state.orders.find(o => o.id === c.orderId)?.orderId || '-'}</td>
-                <td className="px-4 py-3 text-xs">{state.books.find(b => b.id === c.bookId)?.title || '-'}</td>
-                <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
-                <td className="px-4 py-3">{(c.status === 'generated' || c.status === 'distributed' || c.status === 'redeemed') && <button onClick={async () => { const r = await revokeCode(c.id, 'Revoked by admin'); if (r.success) dispatch({ type: 'ADD_NOTIFICATION', payload: { message: 'Code revoked', type: 'success' } }); }} className="text-helix-danger text-xs">Revoke</button>}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function AdminUsers() {
-  const { state, dispatch, updateUser, adminInitiatePasswordReset } = useApp();
-  const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', email: '', role: '' as UserRole, partnerId: '', status: '' as string });
-  const [showAuditHistory, setShowAuditHistory] = useState<User | null>(null);
-  const filtered = roleFilter === 'all' ? state.users : state.users.filter(u => u.role === roleFilter);
-  const openEdit = (user: User) => { setEditingUser(user); setEditForm({ name: user.name, email: user.email, role: user.role, partnerId: user.partnerId || '', status: user.status }); };
-  const saveEdit = async () => {
-    if (!editingUser) return;
-    const result = await updateUser(editingUser.id, { name: editForm.name, email: editForm.email, role: editForm.role, partnerId: editForm.partnerId || undefined, status: editForm.status as any });
-    if (result.success) { dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `User "${editForm.name}" updated`, type: 'success' } }); setEditingUser(null); }
-    else dispatch({ type: 'ADD_NOTIFICATION', payload: { message: result.error || 'Failed', type: 'error' } });
-  };
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div><h1 className="text-2xl font-bold">User Management</h1><p className="text-helix-muted mt-1">Manage users, roles, and access</p></div>
-      <div className="flex gap-2 flex-wrap">
-        {[{ v: 'all', l: 'All' }, { v: 'super_admin', l: 'Admins' }, { v: 'support_agent', l: 'Support' }, { v: 'partner_admin', l: 'Partners' }, { v: 'student', l: 'Students' }].map(r => (
-          <button key={r.v} onClick={() => setRoleFilter(r.v)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${roleFilter === r.v ? 'bg-helix-primary text-white' : 'bg-helix-card text-helix-muted hover:text-helix-text'}`}>{r.l}</button>
-        ))}
-      </div>
-      <div className="glass rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-helix-bg/50"><tr><th className="text-left px-4 py-3 text-helix-muted font-medium">User</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Email</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Role</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Status</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Actions</th></tr></thead>
-            <tbody>{filtered.map(user => (
-              <tr key={user.id} className="border-t border-helix-border hover:bg-helix-bg/30">
-                <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-helix-primary to-helix-accent flex items-center justify-center text-xs font-bold text-white">{user.name.charAt(0)}</div><span className="font-medium">{user.name}</span></div></td>
-                <td className="px-4 py-3 text-helix-muted text-xs">{user.email}</td>
-                <td className="px-4 py-3"><StatusBadge status={user.role} /></td>
-                <td className="px-4 py-3"><StatusBadge status={user.status} /></td>
-                <td className="px-4 py-3"><div className="flex gap-2">
-                  <button onClick={() => openEdit(user)} className="text-helix-primary text-xs flex items-center gap-1"><Edit className="w-3 h-3" /> Edit</button>
-                  <button onClick={() => setShowAuditHistory(user)} className="text-helix-muted text-xs flex items-center gap-1"><History className="w-3 h-3" /> History</button>
-                  <button onClick={async () => { const r = await adminInitiatePasswordReset(user.id); dispatch({ type: 'ADD_NOTIFICATION', payload: { message: r.success ? 'Password reset initiated' : (r.error || 'Failed'), type: r.success ? 'info' : 'error' } }); }} className="text-helix-accent text-xs flex items-center gap-1"><RefreshCw className="w-3 h-3" /> Reset PW</button>
-                </div></td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
-      </div>
-      {editingUser && (
-        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4" onClick={() => setEditingUser(null)}>
-          <div className="glass rounded-xl p-6 max-w-lg w-full animate-fade-in" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold mb-4">Edit User</h3>
-            <div className="space-y-4">
-              <div><label className="block text-sm text-helix-muted mb-1">Name</label><input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-4 py-2.5 bg-helix-bg border border-helix-border rounded-xl text-sm focus:border-helix-primary focus:outline-none" /></div>
-              <div><label className="block text-sm text-helix-muted mb-1">Email</label><input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} className="w-full px-4 py-2.5 bg-helix-bg border border-helix-border rounded-xl text-sm focus:border-helix-primary focus:outline-none" /></div>
-              <div><label className="block text-sm text-helix-muted mb-1">Role</label><select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value as UserRole })} className="w-full px-4 py-2.5 bg-helix-bg border border-helix-border rounded-xl text-sm text-helix-text"><option value="super_admin">Super Admin</option><option value="support_agent">Support Agent</option><option value="partner_admin">Partner Admin</option><option value="student">Student</option></select></div>
-              <div><label className="block text-sm text-helix-muted mb-1">Status</label><select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-4 py-2.5 bg-helix-bg border border-helix-border rounded-xl text-sm text-helix-text"><option value="active">Active</option><option value="suspended">Suspended</option><option value="deactivated">Deactivated</option></select></div>
-            </div>
-            <div className="flex gap-3 justify-end mt-6">
-              <button onClick={() => setEditingUser(null)} className="px-4 py-2 bg-helix-card rounded-lg text-sm">Cancel</button>
-              <button onClick={saveEdit} className="px-4 py-2 bg-helix-primary text-white rounded-lg text-sm font-medium">Save</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showAuditHistory && (
-        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4" onClick={() => setShowAuditHistory(null)}>
-          <div className="glass rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto animate-fade-in" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4"><h3 className="text-lg font-semibold flex items-center gap-2"><History className="w-5 h-5 text-helix-primary" /> Activity: {showAuditHistory.name}</h3><button onClick={() => setShowAuditHistory(null)} className="p-1 rounded hover:bg-helix-card"><X className="w-4 h-4" /></button></div>
-            <div className="space-y-2">{state.auditLogs.filter(l => l.userId === showAuditHistory.id || l.resourceId === showAuditHistory.id || l.details.includes(showAuditHistory.name)).slice(0, 30).map(log => (
-              <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-helix-bg/50">
-                <div className="w-8 h-8 rounded-full bg-helix-primary/20 flex items-center justify-center flex-shrink-0"><Zap className="w-4 h-4 text-helix-primary" /></div>
-                <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><code className="px-1.5 py-0.5 bg-helix-bg rounded text-xs text-helix-accent">{log.action}</code><span className="text-xs text-helix-muted">{new Date(log.createdAt).toLocaleString()}</span></div><p className="text-sm mt-1">{log.details}</p></div>
-              </div>
-            ))}{state.auditLogs.filter(l => l.userId === showAuditHistory.id).length === 0 && <p className="text-sm text-helix-muted text-center py-4">No activity recorded.</p>}</div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AdminReports() {
-  const { state } = useApp();
-  const totalCodes = state.codes.length;
-  const redeemed = state.codes.filter(c => c.status === 'redeemed').length;
-  const redemptionRate = totalCodes > 0 ? Math.round((redeemed / totalCodes) * 100) : 0;
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div><h1 className="text-2xl font-bold">Reports</h1><p className="text-helix-muted mt-1">Platform analytics and metrics</p></div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard icon={Key} label="Total Codes" value={totalCodes} color="primary" />
-        <StatCard icon={Check} label="Redeemed" value={redeemed} color="success" />
-        <StatCard icon={TrendingUp} label="Redemption Rate" value={`${redemptionRate}%`} color="accent" />
-        <StatCard icon={ShoppingCart} label="Orders" value={state.orders.length} color="warning" />
-      </div>
-    </div>
-  );
-}
-
-function AdminAudit() {
-  const { state } = useApp();
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div><h1 className="text-2xl font-bold">Audit Log</h1><p className="text-helix-muted mt-1">Platform activity and security events</p></div>
-      <div className="glass rounded-xl overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-helix-bg/50"><tr><th className="text-left px-4 py-3 text-helix-muted font-medium">Time</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Action</th><th className="text-left px-4 py-3 text-helix-muted font-medium">Details</th></tr></thead><tbody>{state.auditLogs.map(log => (<tr key={log.id} className="border-t border-helix-border hover:bg-helix-bg/30"><td className="px-4 py-3 text-helix-muted text-xs whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td><td className="px-4 py-3"><code className="px-2 py-0.5 bg-helix-bg rounded text-xs text-helix-accent">{log.action}</code></td><td className="px-4 py-3 text-helix-muted text-xs">{log.details}</td></tr>))}</tbody></table></div></div>
-    </div>
-  );
-}
-
-function AdminPartners() {
-  const { state, dispatch, addPartner } = useApp();
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: '', description: '' });
-  const handleCreate = async () => {
-    if (!formData.name) return;
-    await addPartner({ id: uuidv4(), name: formData.name, description: formData.description, status: 'active', adminId: '', studentCount: 0, classroomCount: 0, bookCount: 0, codeQuota: 500, codesUsed: 0, canGenerateCodes: true, createdAt: new Date().toISOString() });
-    dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Partner "${formData.name}" created`, type: 'success' } });
-    setShowForm(false); setFormData({ name: '', description: '' });
-  };
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Learning Partners</h1><p className="text-helix-muted mt-1">Manage organizations</p></div><button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-helix-primary to-helix-primary-light text-white rounded-xl text-sm font-medium"><Plus className="w-4 h-4" /> Add Partner</button></div>
-      {showForm && <div className="glass rounded-xl p-6 animate-fade-in"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Name" className="px-4 py-2.5 bg-helix-bg border border-helix-border rounded-xl text-sm focus:border-helix-primary focus:outline-none" /><input value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Description" className="px-4 py-2.5 bg-helix-bg border border-helix-border rounded-xl text-sm focus:border-helix-primary focus:outline-none" /></div><div className="flex gap-2 mt-4"><button onClick={handleCreate} className="px-4 py-2 bg-helix-primary text-white rounded-lg text-sm font-medium">Create</button><button onClick={() => setShowForm(false)} className="px-4 py-2 bg-helix-card text-helix-muted rounded-lg text-sm">Cancel</button></div></div>}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{state.partners.map(p => (<div key={p.id} className="glass rounded-xl p-5 card-hover"><div className="flex items-start justify-between mb-3"><div className="w-10 h-10 rounded-lg bg-gradient-to-br from-helix-primary/20 to-helix-accent/20 flex items-center justify-center"><Globe className="w-5 h-5 text-helix-primary" /></div><StatusBadge status={p.status} /></div><h3 className="font-semibold">{p.name}</h3><p className="text-sm text-helix-muted mt-1 line-clamp-2">{p.description}</p><div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-helix-border"><div className="text-center"><p className="text-lg font-bold">{p.studentCount}</p><p className="text-xs text-helix-muted">Students</p></div><div className="text-center"><p className="text-lg font-bold">{p.classroomCount}</p><p className="text-xs text-helix-muted">Classes</p></div><div className="text-center"><p className="text-lg font-bold">{p.bookCount}</p><p className="text-xs text-helix-muted">Books</p></div></div></div>))}</div>
-    </div>
-  );
-}
-
-function AdminBooks() {
-  const { state } = useApp();
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div><h1 className="text-2xl font-bold">Book Catalog</h1><p className="text-helix-muted mt-1">Manage the global book library</p></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{state.books.map(book => (<div key={book.id} className="glass rounded-xl p-5 card-hover"><h3 className="font-semibold">{book.title}</h3><p className="text-sm text-helix-muted mt-1">{book.author}</p><p className="text-xs text-helix-muted mt-2 line-clamp-2">{book.description}</p><div className="flex items-center gap-2 mt-3"><StatusBadge status={book.status} /><span className="text-xs text-helix-muted">{book.pageCount} pages</span></div></div>))}</div>
-    </div>
-  );
-}
-
-function AdminSettings() {
-  const { state } = useApp();
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div><h1 className="text-2xl font-bold">Platform Settings</h1><p className="text-helix-muted mt-1">Configure platform policies</p></div>
-      <div className="glass rounded-xl p-6">
-        <div className="bg-helix-warning/10 border border-helix-warning/20 rounded-lg p-4 mb-4">
-          <p className="text-sm text-helix-warning font-medium">Backend Configuration</p>
-          <p className="text-xs text-helix-muted mt-1">
-            {state.isDemoMode ? 'Running in demo mode. Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for production.' : 'Connected to Supabase backend.'}
-          </p>
-        </div>
-        <h3 className="font-semibold mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-helix-primary" /> Security</h3>
-        <div className="space-y-4 text-sm">
-          <div className="flex items-center justify-between"><div><p className="font-medium">MFA for Admins</p><p className="text-xs text-helix-muted">Require MFA for super administrators</p></div><div className="w-10 h-6 bg-helix-primary rounded-full relative cursor-pointer"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" /></div></div>
-          <div className="flex items-center justify-between"><div><p className="font-medium">Content Protection</p><p className="text-xs text-helix-muted">Disable right-click and copy in reader</p></div><div className="w-10 h-6 bg-helix-primary rounded-full relative cursor-pointer"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" /></div></div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ==================== SUPPORT AGENT PAGES ====================
 function SupportDashboard() {
@@ -1028,6 +715,126 @@ function AuthRoute() {
   return <AuthPage />;
 }
 
+// Placeholder components for admin pages not yet migrated
+function AdminOrdersPlaceholder() {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div><h1 className="text-2xl font-bold">Orders & Access Codes</h1><p className="text-helix-muted mt-1">Manage orders and access codes</p></div>
+      <div className="glass rounded-xl p-12 text-center">
+        <ShoppingCart className="w-16 h-16 text-helix-muted mx-auto mb-4" />
+        <h3 className="text-lg font-semibold mb-2">Orders Management</h3>
+        <p className="text-helix-muted">Order management functionality is available through the Support Agent interface.</p>
+      </div>
+    </div>
+  );
+}
+
+function AdminCodesPlaceholder() {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div><h1 className="text-2xl font-bold">Access Codes</h1><p className="text-helix-muted mt-1">View and manage access codes</p></div>
+      <div className="glass rounded-xl p-12 text-center">
+        <Key className="w-16 h-16 text-helix-muted mx-auto mb-4" />
+        <h3 className="text-lg font-semibold mb-2">Access Code Management</h3>
+        <p className="text-helix-muted">Access code management is available through the Support Agent interface.</p>
+      </div>
+    </div>
+  );
+}
+
+function AdminBooksPlaceholder() {
+  const { state } = useApp();
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div><h1 className="text-2xl font-bold">Book Catalog</h1><p className="text-helix-muted mt-1">Manage the global book library</p></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {state.books.map(book => (
+          <div key={book.id} className="glass rounded-xl p-5 card-hover">
+            <h3 className="font-semibold">{book.title}</h3>
+            <p className="text-sm text-helix-muted mt-1">{book.author}</p>
+            <p className="text-xs text-helix-muted mt-2 line-clamp-2">{book.description}</p>
+            <div className="flex items-center gap-2 mt-3">
+              <StatusBadge status={book.status} />
+              <span className="text-xs text-helix-muted">{book.pageCount} pages</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminReportsPlaceholder() {
+  const { state } = useApp();
+  const totalCodes = state.codes.length;
+  const redeemed = state.codes.filter(c => c.status === 'redeemed').length;
+  const redemptionRate = totalCodes > 0 ? Math.round((redeemed / totalCodes) * 100) : 0;
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div><h1 className="text-2xl font-bold">Reports & Analytics</h1><p className="text-helix-muted mt-1">Platform analytics and metrics</p></div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard icon={Key} label="Total Codes" value={totalCodes} color="primary" />
+        <StatCard icon={Check} label="Redeemed" value={redeemed} color="success" />
+        <StatCard icon={TrendingUp} label="Redemption Rate" value={`${redemptionRate}%`} color="accent" />
+        <StatCard icon={ShoppingCart} label="Orders" value={state.orders.length} color="warning" />
+      </div>
+    </div>
+  );
+}
+
+function AdminAuditPlaceholder() {
+  const { state } = useApp();
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div><h1 className="text-2xl font-bold">Audit Logs</h1><p className="text-helix-muted mt-1">Platform activity and security events</p></div>
+      <div className="glass rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-helix-bg/50">
+              <tr>
+                <th className="text-left px-4 py-3 text-helix-muted font-medium">Time</th>
+                <th className="text-left px-4 py-3 text-helix-muted font-medium">Action</th>
+                <th className="text-left px-4 py-3 text-helix-muted font-medium">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.auditLogs.map(log => (
+                <tr key={log.id} className="border-t border-helix-border hover:bg-helix-bg/30">
+                  <td className="px-4 py-3 text-helix-muted text-xs whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
+                  <td className="px-4 py-3"><code className="px-2 py-0.5 bg-helix-bg rounded text-xs text-helix-accent">{log.action}</code></td>
+                  <td className="px-4 py-3 text-helix-muted text-xs">{log.details}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminSettingsPlaceholder() {
+  const { state } = useApp();
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div><h1 className="text-2xl font-bold">System Settings</h1><p className="text-helix-muted mt-1">Configure platform policies</p></div>
+      <div className="glass rounded-xl p-6">
+        <h3 className="font-semibold mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-helix-primary" /> Security</h3>
+        <div className="space-y-4 text-sm">
+          <div className="flex items-center justify-between">
+            <div><p className="font-medium">MFA for Admins</p><p className="text-xs text-helix-muted">Require MFA for super administrators</p></div>
+            <div className="w-10 h-6 bg-helix-primary rounded-full relative cursor-pointer"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" /></div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div><p className="font-medium">Content Protection</p><p className="text-xs text-helix-muted">Disable right-click and copy in reader</p></div>
+            <div className="w-10 h-6 bg-helix-primary rounded-full relative cursor-pointer"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <AppProvider>
@@ -1039,12 +846,12 @@ export default function App() {
           <Route path="/admin/roles" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><RolesPermissions /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/partners" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><PartnerManagement /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/emails" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><PartnerEmails /></AppLayout></ProtectedRoute>} />
-          <Route path="/admin/orders" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminOrders /></AppLayout></ProtectedRoute>} />
-          <Route path="/admin/codes" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminCodes /></AppLayout></ProtectedRoute>} />
-          <Route path="/admin/books" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminBooks /></AppLayout></ProtectedRoute>} />
-          <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminReports /></AppLayout></ProtectedRoute>} />
-          <Route path="/admin/audit" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminAudit /></AppLayout></ProtectedRoute>} />
-          <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminSettings /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/orders" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminOrdersPlaceholder /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/codes" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminCodesPlaceholder /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/books" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminBooksPlaceholder /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminReportsPlaceholder /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/audit" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminAuditPlaceholder /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminSettingsPlaceholder /></AppLayout></ProtectedRoute>} />
           <Route path="/support" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><SupportDashboard /></AppLayout></ProtectedRoute>} />
           <Route path="/support/orders" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><SupportOrders /></AppLayout></ProtectedRoute>} />
           <Route path="/support/codes" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><SupportCodes /></AppLayout></ProtectedRoute>} />
