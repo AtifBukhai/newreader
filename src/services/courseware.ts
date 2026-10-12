@@ -400,10 +400,12 @@ export class CoursewareService {
 
       if (uploadError) throw uploadError;
 
-      // Extract metadata
+      // Extract metadata (can happen asynchronously)
+      // File is immediately available even if metadata extraction continues
       const extractedMetadata = await extractMetadata(file, validation.format);
 
-      // Create courseware record
+      // Create courseware record with immediate availability
+      // Status is 'available' - no mandatory review required
       const coursewareData = {
         ...metadata,
         fileFormat: validation.format,
@@ -411,11 +413,11 @@ export class CoursewareService {
         fileHash,
         storagePath,
         originalFilename: file.name,
-        status: 'awaiting_review' as UploadStatus,
+        status: 'available' as UploadStatus, // Immediate availability
         uploadedBy: userId,
         uploadedAt: new Date().toISOString(),
         metadataExtractedAt: new Date().toISOString(),
-        metadataComplete: false,
+        metadataComplete: Object.keys(extractedMetadata).length > 0,
         ...extractedMetadata
       };
 
@@ -432,7 +434,7 @@ export class CoursewareService {
         filename: file.name,
         size: file.size,
         format: validation.format
-      }, null, 'awaiting_review');
+      }, null, 'available');
 
       return { success: true, data: courseware as Courseware };
     } catch (error) {
