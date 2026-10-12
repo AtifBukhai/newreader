@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useApp } from '../store';
 import { useNavigate } from 'react-router-dom';
-import type { ValidityType, DurationUnit } from '../types';
-import { ArrowLeft, ShoppingCart, BookOpen, Users, Calendar, Clock } from 'lucide-react';
+import type { ValidityType, DurationUnit, Courseware } from '../types';
+import { ArrowLeft, ShoppingCart, BookOpen, Users, Calendar, Clock, Search } from 'lucide-react';
 
 export function OrderCreateForm() {
   const { state, dispatch, createOrder } = useApp();
@@ -19,12 +19,25 @@ export function OrderCreateForm() {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Filter books that are approved for the selected partner
-  const availableBooks = state.books.filter(b => 
-    b.status === 'published' && 
-    (!partnerId || b.approvedPartners.includes(partnerId))
+  // Filter courseware that is eligible for ordering
+  // Eligible: status is 'available' or 'published'
+  const eligibleCourseware = state.courseware.filter(c => 
+    c.status === 'available' || c.status === 'published'
   );
+
+  // Filter by search term
+  const filteredCourseware = eligibleCourseware.filter(c => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      c.title.toLowerCase().includes(search) ||
+      c.author.toLowerCase().includes(search) ||
+      c.originalFilename.toLowerCase().includes(search) ||
+      (c.isbn13 && c.isbn13.toLowerCase().includes(search))
+    );
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,6 +179,21 @@ export function OrderCreateForm() {
             <BookOpen className="w-4 h-4" />
             Book *
           </label>
+          
+          {/* Search Input */}
+          <div className="relative mb-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-helix-muted" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search by title, author, or ISBN..."
+              className="w-full pl-10 pr-4 py-2 bg-helix-bg border border-helix-border rounded-lg focus:border-helix-primary focus:outline-none text-sm"
+              disabled={!partnerId}
+            />
+          </div>
+
+          {/* Courseware Dropdown */}
           <select
             value={bookId}
             onChange={e => setBookId(e.target.value)}
@@ -176,15 +204,45 @@ export function OrderCreateForm() {
             <option value="">
               {partnerId ? 'Select a book' : 'Select a partner first'}
             </option>
-            {availableBooks.map(book => (
-              <option key={book.id} value={book.id}>
-                {book.title} {book.isbn ? `(${book.isbn})` : ''}
-              </option>
-            ))}
+            {filteredCourseware.map((courseware: Courseware) => {
+              // Get publisher name if available
+              const publisher = state.publishers.find(p => p.id === courseware.publisherId);
+              const publisherName = publisher?.name || 'Unknown Publisher';
+              
+              // Format display text
+              let displayText = courseware.title;
+              if (publisherName && publisherName !== 'Unknown Publisher') {
+                displayText += ` — ${publisherName}`;
+              }
+              if (courseware.edition) {
+                displayText += ` — ${courseware.edition} Edition`;
+              }
+              if (courseware.isbn13) {
+                displayText += ` (${courseware.isbn13})`;
+              }
+              
+              return (
+                <option key={courseware.id} value={courseware.id}>
+                  {displayText}
+                </option>
+              );
+            })}
           </select>
-          {partnerId && availableBooks.length === 0 && (
+          
+          {/* Status Messages */}
+          {partnerId && eligibleCourseware.length === 0 && (
             <p className="text-sm text-helix-warning mt-2">
-              No approved books available for this partner
+              No eligible courseware available in the library
+            </p>
+          )}
+          {partnerId && eligibleCourseware.length > 0 && filteredCourseware.length === 0 && (
+            <p className="text-sm text-helix-muted mt-2">
+              No courseware matches your search
+            </p>
+          )}
+          {!partnerId && (
+            <p className="text-xs text-helix-muted mt-2">
+              Select a partner to view available courseware
             </p>
           )}
         </div>
