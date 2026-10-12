@@ -135,54 +135,6 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Initialize from service
-  useEffect(() => {
-    const init = async () => {
-      const currentUser = await kitaboService.getCurrentUser();
-      const demoState = kitaboService.getState();
-      dispatch({
-        type: 'SET_STATE',
-        payload: {
-          currentUser,
-          users: kitaboService.getUsers(),
-          partners: kitaboService.getPartners(),
-          classrooms: kitaboService.getClassrooms(),
-          books: kitaboService.getBooks(),
-          orders: kitaboService.getOrders(),
-          codes: kitaboService.getCodes(),
-          batches: kitaboService.getBatches(),
-          entitlements: kitaboService.getEntitlements(),
-          devices: kitaboService.getDevices(),
-          progress: kitaboService.getProgress(),
-          bookmarks: kitaboService.getBookmarks(),
-          highlights: kitaboService.getHighlights(),
-          auditLogs: kitaboService.getAuditLogs(),
-          exports: kitaboService.getExports(),
-          isLoading: false,
-          isDemoMode: !demoState ? false : true, // demo mode if service has in-memory state
-        }
-      });
-    };
-    init();
-
-    // Subscribe to service changes (for demo mode)
-    const unsubscribe = kitaboService.subscribe(() => {
-      syncFromService();
-    });
-    return unsubscribe;
-  }, []);
-
-  // Auto-dismiss notifications
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = Date.now();
-      state.notifications.forEach(n => {
-        if (now - n.timestamp > 5000) dispatch({ type: 'DISMISS_NOTIFICATION', payload: n.id });
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [state.notifications]);
-
   const syncFromService = useCallback(() => {
     dispatch({
       type: 'SYNC_FROM_SERVICE',
@@ -206,6 +158,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     });
   }, []);
+
+  // Initialize from service
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const currentUser = await kitaboService.getCurrentUser();
+        const demoState = kitaboService.getState();
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            currentUser,
+            users: kitaboService.getUsers(),
+            partners: kitaboService.getPartners(),
+            partnerEmails: kitaboService.getPartnerEmails(),
+            rolePermissions: kitaboService.getRolePermissions(),
+            classrooms: kitaboService.getClassrooms(),
+            books: kitaboService.getBooks(),
+            orders: kitaboService.getOrders(),
+            codes: kitaboService.getCodes(),
+            batches: kitaboService.getBatches(),
+            entitlements: kitaboService.getEntitlements(),
+            devices: kitaboService.getDevices(),
+            progress: kitaboService.getProgress(),
+            bookmarks: kitaboService.getBookmarks(),
+            highlights: kitaboService.getHighlights(),
+            auditLogs: kitaboService.getAuditLogs(),
+            exports: kitaboService.getExports(),
+            isLoading: false,
+            isDemoMode: !demoState ? false : true,
+          }
+        });
+      } catch (error) {
+        console.error('Initialization error:', error);
+        dispatch({ type: 'SET_STATE', payload: { isLoading: false } });
+      }
+    };
+    init();
+
+    // Subscribe to service changes (for demo mode)
+    const unsubscribe = kitaboService.subscribe(() => {
+      syncFromService();
+    });
+    return unsubscribe;
+  }, [syncFromService]);
+
+  // Auto-dismiss notifications
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      state.notifications.forEach(n => {
+        if (now - n.timestamp > 5000) dispatch({ type: 'DISMISS_NOTIFICATION', payload: n.id });
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [state.notifications]);
 
   const getBookContent = (bookId: string) => BOOK_CONTENT[bookId] || DEFAULT_BOOK_CONTENT;
 
