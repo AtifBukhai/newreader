@@ -833,6 +833,178 @@ class KitaboService {
   // ============================================
   // USER DELETION (with protection)
   // ============================================
+  async createUser(userData: { email: string; name: string; role: UserRole; partnerId?: string; status?: UserStatus }, actorId: string): Promise<ServiceResult<User>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    // Validate email uniqueness
+    if (this.demoState!.users.find(u => u.email === userData.email)) {
+      return { success: false, error: 'Email already exists' };
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(userData.email)) {
+      return { success: false, error: 'Invalid email format' };
+    }
+
+    // Validate partner exists if provided
+    if (userData.partnerId && !this.demoState!.partners.find(p => p.id === userData.partnerId)) {
+      return { success: false, error: 'Partner not found' };
+    }
+
+    const newUser: User = {
+      id: generateId(),
+      email: userData.email.toLowerCase().trim(),
+      name: userData.name,
+      role: userData.role,
+      partnerId: userData.partnerId,
+      status: userData.status || 'active',
+      emailVerified: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.demoState!.users.push(newUser);
+    this.addAuditLog(actorId, 'user.created', 'User', newUser.id, `Created user ${newUser.name} (${newUser.email}) with role ${newUser.role}`);
+    this.notify();
+    return { success: true, data: newUser };
+  }
+
+  async deactivateUser(userId: string, actorId: string, reason?: string): Promise<ServiceResult<void>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    const user = this.demoState!.users.find(u => u.id === userId);
+    if (!user) return { success: false, error: 'User not found' };
+
+    if (userId === actorId) {
+      return { success: false, error: 'Cannot deactivate your own account' };
+    }
+
+    if (user.status === 'deactivated') {
+      return { success: false, error: 'User is already deactivated' };
+    }
+
+    // Protection: cannot deactivate the last super admin
+    if (user.role === 'super_admin') {
+      const superAdmins = this.demoState!.users.filter(u => u.role === 'super_admin' && u.status === 'active');
+      if (superAdmins.length <= 1) {
+        return { success: false, error: 'Cannot deactivate the last active Super Admin' };
+      }
+    }
+
+    this.demoState!.users = this.demoState!.users.map(u => 
+      u.id === userId ? { ...u, status: 'deactivated' as UserStatus } : u
+    );
+
+    this.addAuditLog(actorId, 'user.deactivated', 'User', userId, `Deactivated user ${user.name}${reason ? `: ${reason}` : ''}`);
+    this.notify();
+    return { success: true };
+  }
+
+  async reactivateUser(userId: string, actorId: string): Promise<ServiceResult<void>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    const user = this.demoState!.users.find(u => u.id === userId);
+    if (!user) return { success: false, error: 'User not found' };
+
+    if (user.status !== 'deactivated') {
+      return { success: false, error: 'User is not deactivated' };
+    }
+
+    this.demoState!.users = this.demoState!.users.map(u => 
+      u.id === userId ? { ...u, status: 'active' as UserStatus } : u
+    );
+
+    this.addAuditLog(actorId, 'user.reactivated', 'User', userId, `Reactivated user ${user.name}`);
+    this.notify();
+    return { success: true };
+  }
+
+  async resetPassword(userId: string, actorId: string): Promise<ServiceResult<{ resetToken: string }>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    const user = this.demoState!.users.find(u => u.id === userId);
+    if (!user) return { success: false, error: 'User not found' };
+
+    // Generate secure reset token
+    const resetToken = crypto.randomUUID ? crypto.randomUUID() : generateId();
+    const resetExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+
+    this.demoState!.users = this.demoState!.users.map(u => 
+      u.id === userId ? { ...u, passwordResetToken: resetToken, passwordResetExpiry: resetExpiry } : u
+    );
+
+    this.addAuditLog(actorId, 'password_reset.initiated', 'User', userId, `Initiated password reset for ${user.email}`);
+    this.notify();
+    
+    // In production, this would send an email via the configured email service
+    console.log('[Password Reset] Token generated for', user.email, '(In production, email would be sent)');
+    
+    return { success: true, data: { resetToken } };
+  }
+
+  async revokeAccess(userId: string, actorId: string, reason?: string): Promise<ServiceResult<void>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    const user = this.demoState!.users.find(u => u.id === userId);
+    if (!user) return { success: false, error: 'User not found' };
+
+    if (userId === actorId) {
+      return { success: false, error: 'Cannot revoke your own access' };
+    }
+
+    // Revoke access by suspending the account
+    this.demoState!.users = this.demoState!.users.map(u => 
+      u.id === userId ? { ...u, status: 'suspended' as UserStatus } : u
+    );
+
+    // Revoke all entitlements for this user
+    this.demoState!.entitlements = this.demoState!.entitlements.map(e =>
+      e.userId === userId ? { ...e, revoked: true } : e
+    );
+
+    this.addAuditLog(actorId, 'access.revoked', 'User', userId, `Revoked access for ${user.name}${reason ? `: ${reason}` : ''}`);
+    this.notify();
+    return { success: true };
+  }
+
+  async restoreAccess(userId: string, actorId: string): Promise<ServiceResult<void>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    const user = this.demoState!.users.find(u => u.id === userId);
+    if (!user) return { success: false, error: 'User not found' };
+
+    if (user.status !== 'suspended') {
+      return { success: false, error: 'User is not suspended' };
+    }
+
+    // Restore access by reactivating the account
+    this.demoState!.users = this.demoState!.users.map(u => 
+      u.id === userId ? { ...u, status: 'active' as UserStatus } : u
+    );
+
+    this.addAuditLog(actorId, 'access.restored', 'User', userId, `Restored access for ${user.name}`);
+    this.notify();
+    return { success: true };
+  }
+
   async deleteUser(userId: string, actorId: string): Promise<ServiceResult<void>> {
     const actor = this.demoState!.users.find(u => u.id === actorId);
     if (!actor || actor.role !== 'super_admin') {
