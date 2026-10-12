@@ -433,8 +433,18 @@ class KitaboService {
     this.demoState!.orders.push(newOrder);
     this.addAuditLog(actorId, 'order.created', 'Order', newOrder.id, `Created order ${newOrder.orderId}`);
     
-    // Auto-fulfill order for super admins (generate codes immediately)
+    // Auto-approve and fulfill order for super admins (generate codes immediately)
     if (actor.role === 'super_admin') {
+      // First, approve the order
+      const approvedOrder: Order = { 
+        ...newOrder, 
+        status: 'approved',
+        updatedAt: new Date().toISOString()
+      };
+      this.demoState!.orders = this.demoState!.orders.map(o => o.id === newOrder.id ? approvedOrder : o);
+      this.addAuditLog(actorId, 'order.approved', 'Order', newOrder.id, `Auto-approved order ${newOrder.orderId}`);
+      
+      // Then fulfill the order (generate codes)
       const fulfillResult = await this.fulfillOrder(newOrder.id, actorId);
       if (!fulfillResult.success) {
         console.error('[Order Creation] Failed to auto-fulfill order:', fulfillResult.error);
@@ -443,12 +453,15 @@ class KitaboService {
         return { 
           success: false, 
           error: `Order created but code generation failed: ${fulfillResult.error}`,
-          data: newOrder
+          data: approvedOrder
         };
       }
       
       this.addAuditLog(actorId, 'order.auto_fulfilled', 'Order', newOrder.id, 
         `Auto-fulfilled order ${newOrder.orderId} with ${fulfillResult.data?.codes.length} codes`);
+      
+      this.notify();
+      return { success: true, data: fulfillResult.data?.order };
     }
     
     this.notify();
