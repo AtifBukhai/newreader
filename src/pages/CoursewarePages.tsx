@@ -15,8 +15,8 @@ export function CoursewareLibrary() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [formatFilter, setFormatFilter] = useState<string>('all');
 
-  // In demo mode, show empty state
-  const courseware: Courseware[] = [];
+  // Read from state instead of hardcoded empty array
+  const courseware = state.courseware || [];
 
   const filtered = courseware.filter(c => {
     const matchSearch = !search || 
@@ -139,7 +139,7 @@ export function CoursewareLibrary() {
 // BULK UPLOAD
 // ============================================
 export function BulkUpload() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, uploadCourseware } = useApp();
   const [files, setFiles] = useState<File[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -183,23 +183,64 @@ export function BulkUpload() {
     setUploading(true);
     setProgress(new Map());
 
-    // Simulate upload progress for demo
+    let successCount = 0;
+    let errorCount = 0;
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      for (let p = 0; p <= 100; p += 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        setProgress(prev => new Map(prev).set(file.name, p));
+      
+      // Update progress
+      setProgress(prev => new Map(prev).set(file.name, 10));
+
+      try {
+        // Simulate upload progress
+        for (let p = 20; p <= 80; p += 20) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setProgress(prev => new Map(prev).set(file.name, p));
+        }
+
+        // Actually upload the file using the service
+        const result = await uploadCourseware(file, {
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          originalFilename: file.name,
+        });
+
+        if (result.success) {
+          successCount++;
+          setProgress(prev => new Map(prev).set(file.name, 100));
+        } else {
+          errorCount++;
+          dispatch({
+            type: 'ADD_NOTIFICATION',
+            payload: {
+              message: `Failed to upload ${file.name}: ${result.error}`,
+              type: 'error'
+            }
+          });
+        }
+      } catch (error) {
+        errorCount++;
+        dispatch({
+          type: 'ADD_NOTIFICATION',
+          payload: {
+            message: `Error uploading ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            type: 'error'
+          }
+        });
       }
     }
 
     setUploading(false);
-    dispatch({
-      type: 'ADD_NOTIFICATION',
-      payload: {
-        message: `Successfully uploaded ${files.length} file(s)`,
-        type: 'success'
-      }
-    });
+    
+    if (successCount > 0) {
+      dispatch({
+        type: 'ADD_NOTIFICATION',
+        payload: {
+          message: `Successfully uploaded ${successCount} file(s)${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+          type: successCount > 0 && errorCount === 0 ? 'success' : 'info'
+        }
+      });
+    }
 
     // Clear files after upload
     setFiles([]);
@@ -326,16 +367,82 @@ export function BulkUpload() {
 // PUBLISHERS MANAGEMENT
 // ============================================
 export function PublishersManagement() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, createPublisher } = useApp();
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    identifier: '',
+    description: '',
+    website: '',
+    contactName: '',
+    contactEmail: '',
+    contactPhone: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
 
-  // In demo mode, show empty state
-  const publishers: Publisher[] = [];
+  // Read from state instead of hardcoded empty array
+  const publishers = state.publishers || [];
 
   const filtered = publishers.filter(p =>
     !search || p.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name.trim()) {
+      dispatch({
+        type: 'ADD_NOTIFICATION',
+        payload: { message: 'Publisher name is required', type: 'error' }
+      });
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const result = await createPublisher({
+        name: formData.name.trim(),
+        identifier: formData.identifier.trim() || undefined,
+        description: formData.description.trim() || undefined,
+        website: formData.website.trim() || undefined,
+        contactName: formData.contactName.trim() || undefined,
+        contactEmail: formData.contactEmail.trim() || undefined,
+        contactPhone: formData.contactPhone.trim() || undefined,
+        status: 'active',
+      });
+
+      if (result.success) {
+        dispatch({
+          type: 'ADD_NOTIFICATION',
+          payload: { message: `Publisher "${formData.name}" created successfully`, type: 'success' }
+        });
+        setShowCreateModal(false);
+        setFormData({
+          name: '',
+          identifier: '',
+          description: '',
+          website: '',
+          contactName: '',
+          contactEmail: '',
+          contactPhone: '',
+        });
+      } else {
+        dispatch({
+          type: 'ADD_NOTIFICATION',
+          payload: { message: result.error || 'Failed to create publisher', type: 'error' }
+        });
+      }
+    } catch (error) {
+      dispatch({
+        type: 'ADD_NOTIFICATION',
+        payload: { message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error' }
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -398,6 +505,112 @@ export function PublishersManagement() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Create Publisher Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => !submitting && setShowCreateModal(false)}>
+          <div className="glass rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-4">Add New Publisher</h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm text-helix-muted mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-helix-bg border border-helix-border rounded-lg focus:border-helix-primary focus:outline-none"
+                  placeholder="Publisher name"
+                  required
+                  disabled={submitting}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-helix-muted mb-1">Identifier</label>
+                <input
+                  type="text"
+                  value={formData.identifier}
+                  onChange={e => setFormData({ ...formData, identifier: e.target.value })}
+                  className="w-full px-3 py-2 bg-helix-bg border border-helix-border rounded-lg focus:border-helix-primary focus:outline-none"
+                  placeholder="Unique identifier (optional)"
+                  disabled={submitting}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-helix-muted mb-1">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-helix-bg border border-helix-border rounded-lg focus:border-helix-primary focus:outline-none resize-none"
+                  rows={3}
+                  placeholder="Publisher description (optional)"
+                  disabled={submitting}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-helix-muted mb-1">Website</label>
+                <input
+                  type="url"
+                  value={formData.website}
+                  onChange={e => setFormData({ ...formData, website: e.target.value })}
+                  className="w-full px-3 py-2 bg-helix-bg border border-helix-border rounded-lg focus:border-helix-primary focus:outline-none"
+                  placeholder="https://example.com"
+                  disabled={submitting}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-helix-muted mb-1">Contact Name</label>
+                <input
+                  type="text"
+                  value={formData.contactName}
+                  onChange={e => setFormData({ ...formData, contactName: e.target.value })}
+                  className="w-full px-3 py-2 bg-helix-bg border border-helix-border rounded-lg focus:border-helix-primary focus:outline-none"
+                  placeholder="Contact person name (optional)"
+                  disabled={submitting}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-helix-muted mb-1">Contact Email</label>
+                <input
+                  type="email"
+                  value={formData.contactEmail}
+                  onChange={e => setFormData({ ...formData, contactEmail: e.target.value })}
+                  className="w-full px-3 py-2 bg-helix-bg border border-helix-border rounded-lg focus:border-helix-primary focus:outline-none"
+                  placeholder="contact@example.com"
+                  disabled={submitting}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-helix-muted mb-1">Contact Phone</label>
+                <input
+                  type="tel"
+                  value={formData.contactPhone}
+                  onChange={e => setFormData({ ...formData, contactPhone: e.target.value })}
+                  className="w-full px-3 py-2 bg-helix-bg border border-helix-border rounded-lg focus:border-helix-primary focus:outline-none"
+                  placeholder="+1 (555) 123-4567"
+                  disabled={submitting}
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 px-4 py-2 bg-helix-card rounded-lg hover:bg-helix-border transition-colors"
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 px-4 py-2 bg-helix-primary text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? 'Creating...' : 'Create Publisher'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
