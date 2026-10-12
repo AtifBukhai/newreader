@@ -92,6 +92,8 @@ export interface Book {
 
 export type OrderStatus = 'draft' | 'submitted' | 'approved' | 'processing' | 'fulfilled' | 'cancelled';
 export type ValidityPreset = 30 | 90 | 180 | 365 | 'custom';
+export type ValidityType = 'upon_activation' | 'valid_until_date';
+export type DurationUnit = 'days' | 'months' | 'years';
 
 export interface Order {
   id: string;
@@ -110,6 +112,11 @@ export interface Order {
   customerNotes?: string;
   createdAt: string;
   updatedAt: string;
+  // New validity fields
+  validityType: ValidityType;
+  validityDuration?: number; // For 'upon_activation' type
+  validityDurationUnit?: DurationUnit; // For 'upon_activation' type
+  validUntilDate?: string; // For 'valid_until_date' type (ISO date string)
 }
 
 export type CodeStatus = 'generated' | 'distributed' | 'redeemed' | 'expired' | 'revoked' | 'exhausted';
