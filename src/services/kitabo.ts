@@ -432,6 +432,25 @@ class KitaboService {
 
     this.demoState!.orders.push(newOrder);
     this.addAuditLog(actorId, 'order.created', 'Order', newOrder.id, `Created order ${newOrder.orderId}`);
+    
+    // Auto-fulfill order for super admins (generate codes immediately)
+    if (actor.role === 'super_admin') {
+      const fulfillResult = await this.fulfillOrder(newOrder.id, actorId);
+      if (!fulfillResult.success) {
+        console.error('[Order Creation] Failed to auto-fulfill order:', fulfillResult.error);
+        // Order was created but fulfillment failed - this is a partial success
+        this.notify();
+        return { 
+          success: false, 
+          error: `Order created but code generation failed: ${fulfillResult.error}`,
+          data: newOrder
+        };
+      }
+      
+      this.addAuditLog(actorId, 'order.auto_fulfilled', 'Order', newOrder.id, 
+        `Auto-fulfilled order ${newOrder.orderId} with ${fulfillResult.data?.codes.length} codes`);
+    }
+    
     this.notify();
     return { success: true, data: newOrder };
   }
@@ -928,7 +947,7 @@ class KitaboService {
     return { success: true };
   }
 
-  async resetPassword(userId: string, actorId: string): Promise<ServiceResult<{ resetToken: string }>> {
+  async resetPassword(userId: string, actorId: string, newPassword?: string): Promise<ServiceResult<{ resetToken?: string; message: string }>> {
     const actor = this.demoState!.users.find(u => u.id === actorId);
     if (!actor || actor.role !== 'super_admin') {
       return { success: false, error: 'Unauthorized: Super Admin role required' };
@@ -937,7 +956,24 @@ class KitaboService {
     const user = this.demoState!.users.find(u => u.id === userId);
     if (!user) return { success: false, error: 'User not found' };
 
-    // Generate secure reset token
+    // If new password is provided, set it directly (demo mode)
+    if (newPassword) {
+      // Validate password strength
+      if (newPassword.length < 8) {
+        return { success: false, error: 'Password must be at least 8 characters long' };
+      }
+
+      // In demo mode, we just log the password change
+      // In production, this would use Supabase Admin API to update the password
+      this.addAuditLog(actorId, 'password_reset.completed', 'User', userId, `Admin reset password for ${user.email}`);
+      this.notify();
+      
+      console.log('[Password Reset] Password updated for', user.email, '(Demo mode - in production, Supabase Admin API would be used)');
+      
+      return { success: true, data: { message: `Password successfully reset for ${user.email}` } };
+    }
+
+    // Otherwise, generate secure reset token for email-based reset
     const resetToken = crypto.randomUUID ? crypto.randomUUID() : generateId();
     const resetExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
 
@@ -951,7 +987,7 @@ class KitaboService {
     // In production, this would send an email via the configured email service
     console.log('[Password Reset] Token generated for', user.email, '(In production, email would be sent)');
     
-    return { success: true, data: { resetToken } };
+    return { success: true, data: { resetToken, message: `Password reset link sent to ${user.email}` } };
   }
 
   async revokeAccess(userId: string, actorId: string, reason?: string): Promise<ServiceResult<void>> {
