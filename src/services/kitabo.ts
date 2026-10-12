@@ -101,9 +101,9 @@ function createDemoState(): DemoState {
       { id: 'book-3', title: 'Advanced Mathematics', author: 'Prof. Maria Rodriguez', description: 'Calculus and linear algebra.', coverUrl: '', language: 'English', pageCount: 720, categories: ['Mathematics'], tags: ['calculus'], status: 'published', version: '4.2.0', approvedPartners: ['partner-1', 'partner-2'], createdAt: '2023-08-10T10:00:00Z', updatedAt: '2024-04-20T10:00:00Z' },
     ],
     orders: [
-      { id: 'ord-1', orderId: 'SDA-2024-001', partnerId: 'partner-1', bookId: 'book-1', quantity: 50, validityDays: 180, maxDevices: 2, status: 'fulfilled', requestedBy: 'user-partner1', orderDate: '2024-09-01T10:00:00Z', fulfilledAt: '2024-09-02T14:00:00Z', fulfilledBy: 'user-support1', createdAt: '2024-09-01T10:00:00Z', updatedAt: '2024-09-02T14:00:00Z' },
-      { id: 'ord-2', orderId: 'SDA-2024-002', partnerId: 'partner-1', bookId: 'book-2', quantity: 25, validityDays: 90, maxDevices: 2, status: 'approved', requestedBy: 'user-partner1', orderDate: '2024-10-01T10:00:00Z', createdAt: '2024-10-01T10:00:00Z', updatedAt: '2024-10-01T10:00:00Z' },
-      { id: 'ord-3', orderId: 'GLI-2024-001', partnerId: 'partner-2', bookId: 'book-3', quantity: 20, validityDays: 180, maxDevices: 2, status: 'submitted', requestedBy: 'user-partner2', orderDate: '2024-10-10T10:00:00Z', createdAt: '2024-10-10T10:00:00Z', updatedAt: '2024-10-10T10:00:00Z' },
+      { id: 'ord-1', orderId: 'SDA-2024-001', partnerId: 'partner-1', bookId: 'book-1', quantity: 50, validityDays: 180, maxDevices: 2, status: 'fulfilled', requestedBy: 'user-partner1', orderDate: '2024-09-01T10:00:00Z', fulfilledAt: '2024-09-02T14:00:00Z', fulfilledBy: 'user-support1', createdAt: '2024-09-01T10:00:00Z', updatedAt: '2024-09-02T14:00:00Z', validityType: 'upon_activation', validityDuration: 180, validityDurationUnit: 'days' },
+      { id: 'ord-2', orderId: 'SDA-2024-002', partnerId: 'partner-1', bookId: 'book-2', quantity: 25, validityDays: 90, maxDevices: 2, status: 'approved', requestedBy: 'user-partner1', orderDate: '2024-10-01T10:00:00Z', createdAt: '2024-10-01T10:00:00Z', updatedAt: '2024-10-01T10:00:00Z', validityType: 'valid_until_date', validUntilDate: '2025-01-01T00:00:00Z' },
+      { id: 'ord-3', orderId: 'GLI-2024-001', partnerId: 'partner-2', bookId: 'book-3', quantity: 20, validityDays: 180, maxDevices: 2, status: 'submitted', requestedBy: 'user-partner2', orderDate: '2024-10-10T10:00:00Z', createdAt: '2024-10-10T10:00:00Z', updatedAt: '2024-10-10T10:00:00Z', validityType: 'upon_activation', validityDuration: 6, validityDurationUnit: 'months' },
     ],
     codes: [
       { id: 'code-1', code: 'ABCD-EFGH-JK23', orderId: 'ord-1', bookId: 'book-1', partnerId: 'partner-1', status: 'redeemed', validityDays: 180, maxDevices: 2, redeemedBy: 'user-student1', redeemedAt: '2024-09-05T10:00:00Z', expiresAt: '2025-03-05T10:00:00Z', createdAt: '2024-09-02T14:00:00Z', createdBy: 'user-support1' },
@@ -375,12 +375,12 @@ class KitaboService {
   // ============================================
   async createOrder(order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>, actorId: string): Promise<ServiceResult<Order>> {
     const actor = this.demoState!.users.find(u => u.id === actorId);
-    if (!actor || actor.role !== 'partner_admin') {
-      return { success: false, error: 'Unauthorized: Partner Admin role required' };
+    if (!actor || !['partner_admin', 'super_admin'].includes(actor.role)) {
+      return { success: false, error: 'Unauthorized: Partner Admin or Super Admin role required' };
     }
 
-    // Validate partner owns the order
-    if (actor.partnerId !== order.partnerId) {
+    // Validate partner owns the order (for partner admins)
+    if (actor.role === 'partner_admin' && actor.partnerId !== order.partnerId) {
       return { success: false, error: 'Unauthorized: Cannot create order for another organization' };
     }
 
@@ -398,6 +398,29 @@ class KitaboService {
     const book = this.demoState!.books.find(b => b.id === order.bookId);
     if (!book || !book.approvedPartners.includes(order.partnerId)) {
       return { success: false, error: 'Book not approved for your organization' };
+    }
+
+    // Validate validity type and fields
+    if (!order.validityType) {
+      return { success: false, error: 'Validity type is required' };
+    }
+
+    if (order.validityType === 'upon_activation') {
+      if (!order.validityDuration || order.validityDuration < 1) {
+        return { success: false, error: 'Validity duration must be at least 1' };
+      }
+      if (!order.validityDurationUnit) {
+        return { success: false, error: 'Validity duration unit is required' };
+      }
+    } else if (order.validityType === 'valid_until_date') {
+      if (!order.validUntilDate) {
+        return { success: false, error: 'Valid until date is required' };
+      }
+      const validUntil = new Date(order.validUntilDate);
+      const now = new Date();
+      if (validUntil <= now) {
+        return { success: false, error: 'Valid until date must be in the future' };
+      }
     }
 
     const newOrder: Order = {
@@ -465,6 +488,14 @@ class KitaboService {
     // Generate codes
     const batchId = generateId();
     const codes: AccessCode[] = [];
+    
+    // Calculate expiresAt based on validity type
+    let expiresAt: string | undefined;
+    if (order.validityType === 'valid_until_date' && order.validUntilDate) {
+      expiresAt = order.validUntilDate;
+    }
+    // For 'upon_activation', expiresAt will be set when the code is redeemed
+    
     for (let i = 0; i < order.quantity; i++) {
       codes.push({
         id: generateId(),
@@ -476,6 +507,7 @@ class KitaboService {
         status: 'generated',
         validityDays: order.validityDays,
         maxDevices: order.maxDevices,
+        expiresAt, // Will be undefined for 'upon_activation', set for 'valid_until_date'
         createdAt: new Date().toISOString(),
         createdBy: actorId,
       });
@@ -543,7 +575,32 @@ class KitaboService {
     const book = this.demoState!.books.find(b => b.id === accessCode.bookId);
     if (!book) return { success: false, error: 'Book not found' };
 
-    const expiresAt = new Date(Date.now() + accessCode.validityDays * 86400000).toISOString();
+    // Get the order to determine validity type
+    const order = this.demoState!.orders.find(o => o.id === accessCode.orderId);
+    
+    let expiresAt: string;
+    if (order?.validityType === 'upon_activation') {
+      // Calculate expiry based on activation time + duration
+      const now = new Date();
+      let durationMs = 0;
+      
+      if (order.validityDurationUnit === 'days') {
+        durationMs = (order.validityDuration || 0) * 24 * 60 * 60 * 1000;
+      } else if (order.validityDurationUnit === 'months') {
+        durationMs = (order.validityDuration || 0) * 30 * 24 * 60 * 60 * 1000;
+      } else if (order.validityDurationUnit === 'years') {
+        durationMs = (order.validityDuration || 0) * 365 * 24 * 60 * 60 * 1000;
+      }
+      
+      expiresAt = new Date(now.getTime() + durationMs).toISOString();
+    } else if (order?.validityType === 'valid_until_date' && order.validUntilDate) {
+      // Use the fixed expiry date
+      expiresAt = order.validUntilDate;
+    } else {
+      // Fallback to old behavior for backward compatibility
+      expiresAt = new Date(Date.now() + accessCode.validityDays * 86400000).toISOString();
+    }
+
     const entitlement: BookEntitlement = {
       id: generateId(),
       userId,
