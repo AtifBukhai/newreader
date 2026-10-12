@@ -470,6 +470,8 @@ class KitaboService {
     }
 
     // Create courseware record
+    // Set status to 'available' for immediate library visibility
+    // Metadata extraction happens asynchronously but file is immediately available
     const newCourseware: Courseware = {
       id: generateId(),
       fileFormat,
@@ -483,11 +485,11 @@ class KitaboService {
       tags: metadata.tags || [],
       version: '1.0.0',
       isLatestVersion: true,
-      status: 'awaiting_review',
+      status: 'available', // Immediate availability - no mandatory review
       rightsStatus: 'pending',
       uploadedBy: actorId,
       uploadedAt: new Date().toISOString(),
-      metadataComplete: false,
+      metadataComplete: false, // Metadata extraction continues in background
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       ...metadata,
