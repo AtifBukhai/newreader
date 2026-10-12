@@ -36,6 +36,8 @@ export function CoursewareLibrary() {
       validating: { color: 'bg-helix-primary/20 text-helix-primary', icon: RefreshCw },
       validation_failed: { color: 'bg-helix-danger/20 text-helix-danger', icon: XCircle },
       extracting_metadata: { color: 'bg-helix-primary/20 text-helix-primary', icon: RefreshCw },
+      processing: { color: 'bg-helix-primary/20 text-helix-primary', icon: RefreshCw },
+      available: { color: 'bg-helix-success/20 text-helix-success', icon: CheckCircle2 },
       awaiting_review: { color: 'bg-helix-warning/20 text-helix-warning', icon: Clock },
       ready_to_publish: { color: 'bg-helix-success/20 text-helix-success', icon: CheckCircle2 },
       published: { color: 'bg-helix-success/20 text-helix-success', icon: CheckCircle2 },
@@ -81,6 +83,8 @@ export function CoursewareLibrary() {
             className="px-4 py-2 bg-helix-bg border border-helix-border rounded-lg focus:border-helix-primary focus:outline-none"
           >
             <option value="all">All Statuses</option>
+            <option value="processing">Processing</option>
+            <option value="available">Available</option>
             <option value="awaiting_review">Awaiting Review</option>
             <option value="ready_to_publish">Ready to Publish</option>
             <option value="published">Published</option>
