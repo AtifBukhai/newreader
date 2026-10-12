@@ -843,11 +843,13 @@ function AdminSettingsPlaceholder() {
 
 export default function App() {
   console.log('[App] Rendering App component');
-  return (
-    <AppProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<AuthRoute />} />
+  
+  try {
+    return (
+      <AppProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<AuthRoute />} />
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminDashboard /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><UserManagement /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/roles" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><RolesPermissions /></AppLayout></ProtectedRoute>} />
@@ -880,5 +882,15 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AppProvider>
-  );
+    );
+  } catch (error) {
+    console.error('[App] Error rendering application:', error);
+    return (
+      <div style={{ padding: '20px', color: 'white', background: '#0a0a0f' }}>
+        <h1>Application Error</h1>
+        <p>Failed to render application. Check console for details.</p>
+        <pre>{error instanceof Error ? error.stack : String(error)}</pre>
+      </div>
+    );
+  }
 }
