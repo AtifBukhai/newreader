@@ -172,12 +172,14 @@ export function AdminDashboard() {
 
 // ==================== USER MANAGEMENT ====================
 export function UserManagement() {
-  const { state, dispatch, updateUser, deleteUser, adminInitiatePasswordReset } = useApp();
+  const { state, dispatch, updateUser, deleteUser, adminInitiatePasswordReset, resetPassword } = useApp();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [resettingPassword, setResettingPassword] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState('');
   const [editForm, setEditForm] = useState({ name: '', email: '', role: '' as UserRole, partnerId: '', status: '' as UserStatus });
 
   const filteredUsers = state.users.filter(u => {
@@ -220,12 +222,25 @@ export function UserManagement() {
     }
   };
 
-  const handlePasswordReset = async (user: User) => {
-    const result = await adminInitiatePasswordReset(user.id);
-    if (result.success) {
-      dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Password reset email sent to ${user.email}`, type: 'success' } });
+  const handlePasswordReset = async (user: User, password?: string) => {
+    if (password) {
+      // Direct password set (demo mode)
+      const result = await resetPassword(user.id, password);
+      if (result.success) {
+        dispatch({ type: 'ADD_NOTIFICATION', payload: { message: result.message || `Password reset for ${user.email}`, type: 'success' } });
+        setResettingPassword(null);
+        setNewPassword('');
+      } else {
+        dispatch({ type: 'ADD_NOTIFICATION', payload: { message: result.error || 'Failed to reset password', type: 'error' } });
+      }
     } else {
-      dispatch({ type: 'ADD_NOTIFICATION', payload: { message: result.error || 'Failed to send reset email', type: 'error' } });
+      // Send reset email (production mode)
+      const result = await adminInitiatePasswordReset(user.id);
+      if (result.success) {
+        dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Password reset email sent to ${user.email}`, type: 'success' } });
+      } else {
+        dispatch({ type: 'ADD_NOTIFICATION', payload: { message: result.error || 'Failed to send reset email', type: 'error' } });
+      }
     }
   };
 
@@ -322,7 +337,7 @@ export function UserManagement() {
                         <button onClick={() => openEdit(user)} className="p-1.5 rounded-lg hover:bg-helix-primary/20 text-helix-muted hover:text-helix-primary" title="Edit">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handlePasswordReset(user)} className="p-1.5 rounded-lg hover:bg-helix-accent/20 text-helix-muted hover:text-helix-accent" title="Reset Password">
+                        <button onClick={() => setResettingPassword(user)} className="p-1.5 rounded-lg hover:bg-helix-accent/20 text-helix-muted hover:text-helix-accent" title="Reset Password">
                           <Key className="w-4 h-4" />
                         </button>
                         <button onClick={() => setDeletingUser(user)} className="p-1.5 rounded-lg hover:bg-helix-danger/20 text-helix-muted hover:text-helix-danger" title="Delete">
@@ -445,6 +460,54 @@ export function UserManagement() {
               </button>
               <button onClick={handleDelete} className="flex-1 px-4 py-2 bg-helix-danger text-white rounded-lg hover:opacity-90">
                 Deactivate User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {resettingPassword && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => { setResettingPassword(null); setNewPassword(''); }}>
+          <div className="glass rounded-xl p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Key className="w-5 h-5 text-helix-accent" />
+              Reset Password
+            </h3>
+            <div className="bg-helix-bg/50 rounded-lg p-4 mb-4">
+              <p className="font-medium">{resettingPassword.name}</p>
+              <p className="text-sm text-helix-muted">{resettingPassword.email}</p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-helix-muted mb-1">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 bg-helix-bg border border-helix-border rounded-lg focus:border-helix-primary focus:outline-none"
+                  placeholder="Enter new password (min 8 characters)"
+                  minLength={8}
+                  autoFocus
+                />
+                <p className="text-xs text-helix-muted mt-1">
+                  Password must be at least 8 characters long
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button 
+                onClick={() => { setResettingPassword(null); setNewPassword(''); }} 
+                className="flex-1 px-4 py-2 bg-helix-card rounded-lg hover:bg-helix-border"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => handlePasswordReset(resettingPassword, newPassword)}
+                disabled={newPassword.length < 8}
+                className="flex-1 px-4 py-2 bg-helix-accent text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Reset Password
               </button>
             </div>
           </div>
