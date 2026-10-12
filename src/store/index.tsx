@@ -5,7 +5,7 @@ import type {
   User, LearningPartner, Classroom, Book, AccessCode, AccessCodeBatch, Order,
   BookEntitlement, ReadingProgress, Bookmark, Highlight, AuditLogEntry,
   RegisteredDevice, ExportRecord, UserRole, UserStatus, OrderStatus, CodeStatus,
-  PartnerEmail, RolePermission
+  PartnerEmail, RolePermission, Publisher, Courseware, Category, Subject
 } from '../types';
 
 // ===== Book Content (static, not from backend) =====
@@ -48,6 +48,11 @@ interface AppState {
   highlights: Highlight[];
   auditLogs: AuditLogEntry[];
   exports: ExportRecord[];
+  // Courseware Management
+  publishers: Publisher[];
+  courseware: Courseware[];
+  categories: Category[];
+  subjects: Subject[];
   notifications: { id: string; message: string; type: 'success' | 'error' | 'info'; timestamp: number }[];
   isLoading: boolean;
   isDemoMode: boolean;
@@ -87,6 +92,7 @@ const initialState: AppState = {
   currentUser: null, users: [], partners: [], partnerEmails: [], rolePermissions: [],
   classrooms: [], books: [], orders: [], codes: [], batches: [], entitlements: [], devices: [],
   progress: [], bookmarks: [], highlights: [], auditLogs: [], exports: [],
+  publishers: [], courseware: [], categories: [], subjects: [],
   notifications: [], isLoading: true, isDemoMode: false,
 };
 
@@ -133,6 +139,12 @@ interface AppContextType {
   deletePartnerEmail: (emailId: string) => Promise<{ success: boolean; error?: string }>;
   updateRolePermission: (permissionId: string, enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   hasPermission: (role: any, module: any, action: any) => boolean;
+  // Courseware Management
+  createPublisher: (data: Omit<Publisher, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; error?: string; data?: Publisher }>;
+  updatePublisher: (publisherId: string, updates: Partial<Publisher>) => Promise<{ success: boolean; error?: string; data?: Publisher }>;
+  uploadCourseware: (file: File, metadata: Partial<Courseware>) => Promise<{ success: boolean; error?: string; data?: Courseware }>;
+  updateCourseware: (coursewareId: string, updates: Partial<Courseware>) => Promise<{ success: boolean; error?: string; data?: Courseware }>;
+  publishCourseware: (coursewareId: string) => Promise<{ success: boolean; error?: string; data?: Courseware }>;
   syncFromService: () => void;
 }
 
@@ -172,6 +184,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           highlights: kitaboService.getHighlights(),
           auditLogs: kitaboService.getAuditLogs(),
           exports: kitaboService.getExports(),
+          publishers: kitaboService.getPublishers(),
+          courseware: kitaboService.getCourseware(),
+          categories: kitaboService.getCategories(),
+          subjects: kitaboService.getSubjects(),
         }
       });
     } finally {
@@ -214,6 +230,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             highlights: kitaboService.getHighlights(),
             auditLogs: kitaboService.getAuditLogs(),
             exports: kitaboService.getExports(),
+            publishers: kitaboService.getPublishers(),
+            courseware: kitaboService.getCourseware(),
+            categories: kitaboService.getCategories(),
+            subjects: kitaboService.getSubjects(),
             isLoading: false,
             isDemoMode: !demoState ? false : true,
           }
@@ -442,6 +462,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return kitaboService.hasPermission(role, module, action);
   };
 
+  // Courseware Management
+  const createPublisher = async (data: Omit<Publisher, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.createPublisher(data, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error, data: result.data };
+  };
+
+  const updatePublisher = async (publisherId: string, updates: Partial<Publisher>) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.updatePublisher(publisherId, updates, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error, data: result.data };
+  };
+
+  const uploadCourseware = async (file: File, metadata: Partial<Courseware>) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.uploadCourseware(file, metadata, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error, data: result.data };
+  };
+
+  const updateCourseware = async (coursewareId: string, updates: Partial<Courseware>) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.updateCourseware(coursewareId, updates, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error, data: result.data };
+  };
+
+  const publishCourseware = async (coursewareId: string) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.publishCourseware(coursewareId, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error, data: result.data };
+  };
+
   return (
     <AppContext.Provider value={{
       state, dispatch, getBookContent,
@@ -454,6 +510,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       registerDevice,
       addPartnerEmail, updatePartnerEmail, verifyPartnerEmail, deletePartnerEmail,
       updateRolePermission, hasPermission,
+      createPublisher, updatePublisher, uploadCourseware, updateCourseware, publishCourseware,
       syncFromService,
     }}>
       {children}
