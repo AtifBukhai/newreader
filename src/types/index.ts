@@ -261,6 +261,8 @@ export type UploadStatus =
   | 'validating' 
   | 'validation_failed' 
   | 'extracting_metadata' 
+  | 'processing' 
+  | 'available' 
   | 'awaiting_review' 
   | 'ready_to_publish' 
   | 'published' 
