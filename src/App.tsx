@@ -21,6 +21,7 @@ import {
 
 // ==================== AUTH PAGE ====================
 function AuthPage() {
+  console.log('[AuthPage] Rendering login page');
   const { signIn, signUp, state } = useApp();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
@@ -693,8 +694,13 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
 function AuthRoute() {
   const { state, signOut } = useApp();
   const navigate = useNavigate();
-  if (state.isLoading) return <div className="min-h-screen flex items-center justify-center"><div className="text-helix-muted">Loading...</div></div>;
+  console.log('[AuthRoute] Rendering, isLoading:', state.isLoading, 'currentUser:', state.currentUser?.email || 'null');
+  if (state.isLoading) {
+    console.log('[AuthRoute] Showing loading state');
+    return <div className="min-h-screen flex items-center justify-center"><div className="text-helix-muted">Loading...</div></div>;
+  }
   if (state.currentUser) {
+    console.log('[AuthRoute] User logged in, redirecting to dashboard');
     if (state.currentUser.status !== 'active') {
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
@@ -836,6 +842,7 @@ function AdminSettingsPlaceholder() {
 }
 
 export default function App() {
+  console.log('[App] Rendering App component');
   return (
     <AppProvider>
       <BrowserRouter>

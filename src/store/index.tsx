@@ -161,10 +161,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Initialize from service
   useEffect(() => {
+    console.log('[Kitabo Store] Starting initialization...');
     const init = async () => {
       try {
+        console.log('[Kitabo Store] Getting current user...');
         const currentUser = await kitaboService.getCurrentUser();
+        console.log('[Kitabo Store] Current user:', currentUser?.email || 'null');
+        
+        console.log('[Kitabo Store] Getting demo state...');
         const demoState = kitaboService.getState();
+        console.log('[Kitabo Store] Demo state:', demoState ? 'available' : 'null');
+        
+        console.log('[Kitabo Store] Dispatching SET_STATE...');
         dispatch({
           type: 'SET_STATE',
           payload: {
@@ -189,8 +197,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             isDemoMode: !demoState ? false : true,
           }
         });
+        console.log('[Kitabo Store] Initialization complete!');
       } catch (error) {
-        console.error('Initialization error:', error);
+        console.error('[Kitabo Store] Initialization error:', error);
         dispatch({ type: 'SET_STATE', payload: { isLoading: false } });
       }
     };
@@ -198,6 +207,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Subscribe to service changes (for demo mode)
     const unsubscribe = kitaboService.subscribe(() => {
+      console.log('[Kitabo Store] Service state changed, syncing...');
       syncFromService();
     });
     return unsubscribe;
