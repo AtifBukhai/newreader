@@ -45,8 +45,8 @@ export interface PartnerEmail {
   createdAt: string;
 }
 
-export type PermissionModule = 'users' | 'partners' | 'orders' | 'codes' | 'reports' | 'audit' | 'settings' | 'books';
-export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'manage' | 'export';
+export type PermissionModule = 'users' | 'partners' | 'orders' | 'codes' | 'reports' | 'audit' | 'settings' | 'books' | 'courseware';
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'manage' | 'export' | 'upload' | 'publish';
 
 export interface RolePermission {
   id: string;
@@ -245,4 +245,250 @@ export interface DashboardStats {
   totalOrders: number;
   pendingOrders: number;
   fulfilledOrders: number;
+}
+
+// ============================================
+// COURSEWARE MANAGEMENT TYPES
+// ============================================
+
+export type PublisherStatus = 'active' | 'inactive' | 'suspended';
+export type FileFormat = 'epub' | 'pdf' | 'unknown';
+export type RightsStatus = 'pending' | 'approved' | 'expired' | 'rejected';
+export type UploadStatus = 
+  | 'selected' 
+  | 'uploading' 
+  | 'uploaded' 
+  | 'validating' 
+  | 'validation_failed' 
+  | 'extracting_metadata' 
+  | 'awaiting_review' 
+  | 'ready_to_publish' 
+  | 'published' 
+  | 'processing_failed' 
+  | 'quarantined' 
+  | 'archived';
+
+export interface Publisher {
+  id: string;
+  name: string;
+  identifier?: string;
+  description?: string;
+  logoUrl?: string;
+  website?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  status: PublisherStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  parentId?: string;
+  createdAt: string;
+}
+
+export interface Subject {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+}
+
+export interface Courseware {
+  id: string;
+  bookId?: string;
+  
+  // Publisher
+  publisherId?: string;
+  
+  // File info
+  fileFormat: FileFormat;
+  fileSize: number;
+  fileHash: string;
+  storagePath: string;
+  originalFilename: string;
+  
+  // Metadata
+  title: string;
+  subtitle?: string;
+  author: string;
+  isbn10?: string;
+  isbn13?: string;
+  edition?: string;
+  publicationYear?: number;
+  language: string;
+  description?: string;
+  pageCount?: number;
+  coverUrl?: string;
+  
+  // Classification
+  categoryId?: string;
+  subjectId?: string;
+  courseName?: string;
+  certification?: string;
+  level?: string;
+  tags: string[];
+  
+  // Version
+  version: string;
+  isLatestVersion: boolean;
+  previousVersionId?: string;
+  
+  // Status
+  status: UploadStatus;
+  
+  // Rights
+  rightsHolder?: string;
+  licenseReference?: string;
+  rightsStatus: RightsStatus;
+  rightsApprovedBy?: string;
+  rightsApprovedAt?: string;
+  rightsExpiryDate?: string;
+  rightsNotes?: string;
+  
+  // Processing
+  uploadedBy: string;
+  uploadedAt: string;
+  validatedAt?: string;
+  metadataExtractedAt?: string;
+  publishedAt?: string;
+  publishedBy?: string;
+  
+  // Metadata quality
+  metadataComplete: boolean;
+  metadataReviewNotes?: string;
+  
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UploadBatch {
+  id: string;
+  name: string;
+  description?: string;
+  publisherId?: string;
+  totalFiles: number;
+  successfulUploads: number;
+  failedUploads: number;
+  status: UploadStatus;
+  initiatedBy: string;
+  startedAt?: string;
+  completedAt?: string;
+  errorReportUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UploadJob {
+  id: string;
+  batchId?: string;
+  coursewareId?: string;
+  
+  // Job tracking
+  status: UploadStatus;
+  progress: number;
+  retryCount: number;
+  maxRetries: number;
+  
+  // File info
+  originalFilename: string;
+  fileSize: number;
+  fileFormat?: FileFormat;
+  
+  // Processing results
+  validationResult?: any;
+  metadataResult?: any;
+  errorMessage?: string;
+  errorDetails?: any;
+  
+  // Timestamps
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublisherRights {
+  id: string;
+  publisherId: string;
+  coursewareId?: string;
+  
+  // Authorization
+  rightsHolder: string;
+  licenseType?: string;
+  licenseReference?: string;
+  agreementDocumentUrl?: string;
+  
+  // Scope
+  distributionScope?: string;
+  allowedPartners: string[];
+  
+  // Duration
+  startDate: string;
+  expiryDate?: string;
+  isPerpetual: boolean;
+  
+  // Status
+  status: RightsStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  reviewNotes?: string;
+  
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CoursewareAuditLog {
+  id: string;
+  coursewareId?: string;
+  batchId?: string;
+  
+  actorId: string;
+  action: string;
+  details?: any;
+  previousStatus?: UploadStatus;
+  newStatus?: UploadStatus;
+  
+  ipAddress?: string;
+  userAgent?: string;
+  
+  createdAt: string;
+}
+
+export interface DuplicateDetectionLog {
+  id: string;
+  coursewareId: string;
+  duplicateOf?: string;
+  
+  detectionMethod: 'file_hash' | 'isbn' | 'title_edition';
+  confidence: 'exact' | 'high' | 'medium' | 'low';
+  details?: any;
+  
+  resolution?: 'skipped' | 'new_version' | 'replaced' | 'reviewed';
+  resolvedBy?: string;
+  resolvedAt?: string;
+  
+  createdAt: string;
+}
+
+export interface CoursewareManifestRow {
+  filename: string;
+  title?: string;
+  author?: string;
+  publisher?: string;
+  isbn?: string;
+  edition?: string;
+  publicationYear?: number;
+  language?: string;
+  category?: string;
+  subject?: string;
+  tags?: string[];
+  // Validation
+  isValid?: boolean;
+  errors?: string[];
+  warnings?: string[];
 }
