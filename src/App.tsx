@@ -8,6 +8,7 @@ import { RolesPermissions } from './pages/RolesPermissions';
 import { OrdersList } from './pages/OrdersList';
 import { OrderCreateForm } from './pages/OrderCreateForm';
 import { OrderDetails } from './pages/OrderDetails';
+import { CoursewareLibrary, BulkUpload, PublishersManagement } from './pages/CoursewarePages';
 import {
   BookOpen, Users, GraduationCap, Shield, Settings, LogOut, Home, Library,
   Key, BarChart3, FileText, Search, Plus, Edit, Trash2, Eye,
@@ -152,6 +153,9 @@ function Sidebar({ role }: { role: string }) {
       { to: '/admin/roles', icon: Shield, label: 'Roles & Permissions' },
       { to: '/admin/partners', icon: Globe, label: 'Partner Management' },
       { to: '/admin/emails', icon: Mail, label: 'Partner Emails' },
+      { to: '/admin/courseware', icon: Library, label: 'Courseware Library' },
+      { to: '/admin/courseware/upload', icon: Plus, label: 'Bulk Upload' },
+      { to: '/admin/courseware/publishers', icon: Users, label: 'Publishers' },
       { to: '/admin/orders', icon: ShoppingCart, label: 'Orders & Codes' },
       { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
       { to: '/admin/audit', icon: FileText, label: 'Audit Logs' },
@@ -920,6 +924,9 @@ export default function App() {
           <Route path="/admin/books" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminBooksPlaceholder /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminReportsPlaceholder /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/audit" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminAuditPlaceholder /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/courseware" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><CoursewareLibrary /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/courseware/upload" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><BulkUpload /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/courseware/publishers" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><PublishersManagement /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminSettingsPlaceholder /></AppLayout></ProtectedRoute>} />
           <Route path="/support" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><SupportDashboard /></AppLayout></ProtectedRoute>} />
           <Route path="/support/orders" element={<ProtectedRoute allowedRoles={['support_agent']}><AppLayout role="support_agent"><OrdersList /></AppLayout></ProtectedRoute>} />
