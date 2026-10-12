@@ -146,12 +146,12 @@ export function AdminDashboard() {
             ) : (
               pendingOrders.map(order => {
                 const partner = state.partners.find(p => p.id === order.partnerId);
-                const book = state.books.find(b => b.id === order.bookId);
+                const courseware = state.courseware.find(c => c.id === order.bookId);
                 return (
                   <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-helix-bg/50">
                     <div>
                       <p className="font-medium text-sm">{order.orderId}</p>
-                      <p className="text-xs text-helix-muted">{partner?.name} • {book?.title}</p>
+                      <p className="text-xs text-helix-muted">{partner?.name} • {courseware?.title}</p>
                     </div>
                     <div className="text-right">
                       <span className={`px-2 py-1 rounded-full text-xs ${order.status === 'submitted' ? 'bg-helix-warning/20 text-helix-warning' : 'bg-helix-accent/20 text-helix-accent'}`}>
