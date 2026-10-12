@@ -134,33 +134,48 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const isSyncingRef = React.useRef(false);
 
   const syncFromService = useCallback(() => {
-    dispatch({
-      type: 'SYNC_FROM_SERVICE',
-      payload: {
-        users: kitaboService.getUsers(),
-        partners: kitaboService.getPartners(),
-        partnerEmails: kitaboService.getPartnerEmails(),
-        rolePermissions: kitaboService.getRolePermissions(),
-        classrooms: kitaboService.getClassrooms(),
-        books: kitaboService.getBooks(),
-        orders: kitaboService.getOrders(),
-        codes: kitaboService.getCodes(),
-        batches: kitaboService.getBatches(),
-        entitlements: kitaboService.getEntitlements(),
-        devices: kitaboService.getDevices(),
-        progress: kitaboService.getProgress(),
-        bookmarks: kitaboService.getBookmarks(),
-        highlights: kitaboService.getHighlights(),
-        auditLogs: kitaboService.getAuditLogs(),
-        exports: kitaboService.getExports(),
-      }
-    });
+    // Prevent recursive sync calls
+    if (isSyncingRef.current) {
+      console.log('[Kitabo Store] Sync already in progress, skipping');
+      return;
+    }
+    
+    isSyncingRef.current = true;
+    console.log('[Kitabo Store] Syncing from service...');
+    
+    try {
+      dispatch({
+        type: 'SYNC_FROM_SERVICE',
+        payload: {
+          users: kitaboService.getUsers(),
+          partners: kitaboService.getPartners(),
+          partnerEmails: kitaboService.getPartnerEmails(),
+          rolePermissions: kitaboService.getRolePermissions(),
+          classrooms: kitaboService.getClassrooms(),
+          books: kitaboService.getBooks(),
+          orders: kitaboService.getOrders(),
+          codes: kitaboService.getCodes(),
+          batches: kitaboService.getBatches(),
+          entitlements: kitaboService.getEntitlements(),
+          devices: kitaboService.getDevices(),
+          progress: kitaboService.getProgress(),
+          bookmarks: kitaboService.getBookmarks(),
+          highlights: kitaboService.getHighlights(),
+          auditLogs: kitaboService.getAuditLogs(),
+          exports: kitaboService.getExports(),
+        }
+      });
+    } finally {
+      isSyncingRef.current = false;
+    }
   }, []);
 
   // Initialize from service
   useEffect(() => {
+    console.log('[Kitabo Store] Setting up subscription...');
     console.log('[Kitabo Store] Starting initialization...');
     const init = async () => {
       try {
@@ -206,11 +221,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     init();
 
     // Subscribe to service changes (for demo mode)
+    let subscriptionCount = 0;
     const unsubscribe = kitaboService.subscribe(() => {
-      console.log('[Kitabo Store] Service state changed, syncing...');
+      subscriptionCount++;
+      console.log(`[Kitabo Store] Service state changed, syncing... (subscription #${subscriptionCount})`);
       syncFromService();
     });
-    return unsubscribe;
+    console.log('[Kitabo Store] Subscription set up');
+    
+    return () => {
+      console.log('[Kitabo Store] Cleaning up subscription...');
+      unsubscribe();
+    };
   }, [syncFromService]);
 
   // Auto-dismiss notifications
@@ -228,19 +250,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Service-backed operations
   const signIn = async (email: string, password: string) => {
+    console.log('[Kitabo Store] signIn called for:', email);
     const result = await kitaboService.signIn(email, password);
     if (result.success && result.data) {
+      console.log('[Kitabo Store] Login successful, dispatching LOGIN');
       dispatch({ type: 'LOGIN', payload: result.data });
-      syncFromService();
+      // Don't call syncFromService here - the service notification will handle it
+      console.log('[Kitabo Store] LOGIN dispatched, waiting for service notification');
     }
     return { success: result.success, error: result.error };
   };
 
   const signUp = async (email: string, password: string, name: string) => {
+    console.log('[Kitabo Store] signUp called for:', email);
     const result = await kitaboService.signUp(email, password, name);
     if (result.success && result.data) {
+      console.log('[Kitabo Store] Signup successful, dispatching LOGIN');
       dispatch({ type: 'LOGIN', payload: result.data });
-      syncFromService();
+      // Don't call syncFromService here - the service notification will handle it
+      console.log('[Kitabo Store] LOGIN dispatched, waiting for service notification');
     }
     return { success: result.success, error: result.error };
   };
