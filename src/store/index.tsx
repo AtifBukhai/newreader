@@ -4,7 +4,7 @@ import { kitaboService } from '../services/kitabo';
 import type {
   User, LearningPartner, Classroom, Book, AccessCode, AccessCodeBatch, Order,
   BookEntitlement, ReadingProgress, Bookmark, Highlight, AuditLogEntry,
-  RegisteredDevice, ExportRecord, UserRole, OrderStatus, CodeStatus,
+  RegisteredDevice, ExportRecord, UserRole, UserStatus, OrderStatus, CodeStatus,
   PartnerEmail, RolePermission
 } from '../types';
 
@@ -105,6 +105,12 @@ interface AppContextType {
   revokeCode: (codeId: string, reason: string) => Promise<{ success: boolean; error?: string }>;
   updateUser: (userId: string, updates: Partial<User>) => Promise<{ success: boolean; error?: string }>;
   deleteUser: (userId: string) => Promise<{ success: boolean; error?: string }>;
+  createUser: (userData: { email: string; name: string; role: UserRole; partnerId?: string; status?: UserStatus }) => Promise<{ success: boolean; error?: string; data?: User }>;
+  deactivateUser: (userId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
+  reactivateUser: (userId: string) => Promise<{ success: boolean; error?: string }>;
+  resetPassword: (userId: string) => Promise<{ success: boolean; error?: string }>;
+  revokeAccess: (userId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
+  restoreAccess: (userId: string) => Promise<{ success: boolean; error?: string }>;
   exportCodesCSV: (orderId: string) => { success: boolean; data?: string; error?: string };
   requestPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   adminInitiatePasswordReset: (userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -355,6 +361,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { success: result.success, error: result.error };
   };
 
+  const createUser = async (userData: { email: string; name: string; role: UserRole; partnerId?: string; status?: UserStatus }) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.createUser(userData, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error, data: result.data };
+  };
+
+  const deactivateUser = async (userId: string, reason?: string) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.deactivateUser(userId, state.currentUser.id, reason);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
+  const reactivateUser = async (userId: string) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.reactivateUser(userId, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
+  const resetPassword = async (userId: string) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.resetPassword(userId, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
+  const revokeAccess = async (userId: string, reason?: string) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.revokeAccess(userId, state.currentUser.id, reason);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
+  const restoreAccess = async (userId: string) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.restoreAccess(userId, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
   const addPartnerEmail = async (partnerId: string, email: string) => {
     if (!state.currentUser) return { success: false, error: 'Not authenticated' };
     const result = await kitaboService.addPartnerEmail(partnerId, email, state.currentUser.id);
@@ -398,7 +446,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       state, dispatch, getBookContent,
       signIn, signUp, signOut, createOrder, updateOrderStatus, fulfillOrder,
-      redeemCode, revokeCode, updateUser, deleteUser, exportCodesCSV,
+      redeemCode, revokeCode, updateUser, deleteUser, createUser, deactivateUser,
+      reactivateUser, resetPassword, revokeAccess, restoreAccess, exportCodesCSV,
       requestPasswordReset, adminInitiatePasswordReset,
       addPartner, updatePartner, addBook, updateBook, addClassroom, addUser,
       updateProgress, addBookmark, deleteBookmark, addHighlight, deleteHighlight,
