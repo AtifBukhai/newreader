@@ -9,6 +9,7 @@ export interface User {
   role: UserRole;
   partnerId?: string;
   status: UserStatus;
+  emailVerified?: boolean;
   avatar?: string;
   createdAt: string;
   lastLogin?: string;
@@ -20,6 +21,8 @@ export interface LearningPartner {
   id: string;
   name: string;
   description: string;
+  primaryContactName?: string;
+  primaryContactEmail?: string;
   status: 'active' | 'suspended' | 'archived';
   adminId: string;
   studentCount: number;
@@ -29,6 +32,28 @@ export interface LearningPartner {
   codesUsed: number;
   canGenerateCodes: boolean;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PartnerEmail {
+  id: string;
+  partnerId: string;
+  email: string;
+  isPrimary: boolean;
+  isVerified: boolean;
+  verifiedAt?: string;
+  createdAt: string;
+}
+
+export type PermissionModule = 'users' | 'partners' | 'orders' | 'codes' | 'reports' | 'audit' | 'settings' | 'books';
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'manage' | 'export';
+
+export interface RolePermission {
+  id: string;
+  role: UserRole;
+  module: PermissionModule;
+  action: PermissionAction;
+  enabled: boolean;
 }
 
 export interface Classroom {

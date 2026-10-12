@@ -17,7 +17,8 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type {
   User, UserRole, UserStatus, LearningPartner, Book, Order, OrderStatus,
   AccessCode, CodeStatus, AccessCodeBatch, BookEntitlement, ReadingProgress,
-  Bookmark, Highlight, AuditLogEntry, RegisteredDevice, ExportRecord, Classroom
+  Bookmark, Highlight, AuditLogEntry, RegisteredDevice, ExportRecord, Classroom,
+  PartnerEmail, RolePermission, PermissionModule, PermissionAction
 } from '../types';
 
 // ============================================
@@ -36,6 +37,8 @@ interface DemoState {
   currentUser: User | null;
   users: User[];
   partners: LearningPartner[];
+  partnerEmails: PartnerEmail[];
+  rolePermissions: RolePermission[];
   classrooms: Classroom[];
   books: Book[];
   orders: Order[];
@@ -120,6 +123,61 @@ function createDemoState(): DemoState {
     highlights: [],
     auditLogs: [],
     exports: [],
+    partnerEmails: [
+      { id: 'pe-1', partnerId: 'partner-1', email: 'admin@stanford.edu', isPrimary: true, isVerified: true, verifiedAt: '2023-06-01T10:00:00Z', createdAt: '2023-06-01T10:00:00Z' },
+      { id: 'pe-2', partnerId: 'partner-1', email: 'contact@stanford.edu', isPrimary: false, isVerified: true, verifiedAt: '2023-06-15T10:00:00Z', createdAt: '2023-06-15T10:00:00Z' },
+      { id: 'pe-3', partnerId: 'partner-2', email: 'admin@globallearn.org', isPrimary: true, isVerified: true, verifiedAt: '2023-09-15T10:00:00Z', createdAt: '2023-09-15T10:00:00Z' },
+    ],
+    rolePermissions: [
+      // Super Admin - all permissions
+      { id: 'rp-1', role: 'super_admin', module: 'users', action: 'view', enabled: true },
+      { id: 'rp-2', role: 'super_admin', module: 'users', action: 'create', enabled: true },
+      { id: 'rp-3', role: 'super_admin', module: 'users', action: 'edit', enabled: true },
+      { id: 'rp-4', role: 'super_admin', module: 'users', action: 'delete', enabled: true },
+      { id: 'rp-5', role: 'super_admin', module: 'users', action: 'manage', enabled: true },
+      { id: 'rp-6', role: 'super_admin', module: 'partners', action: 'view', enabled: true },
+      { id: 'rp-7', role: 'super_admin', module: 'partners', action: 'create', enabled: true },
+      { id: 'rp-8', role: 'super_admin', module: 'partners', action: 'edit', enabled: true },
+      { id: 'rp-9', role: 'super_admin', module: 'partners', action: 'delete', enabled: true },
+      { id: 'rp-10', role: 'super_admin', module: 'partners', action: 'manage', enabled: true },
+      { id: 'rp-11', role: 'super_admin', module: 'orders', action: 'view', enabled: true },
+      { id: 'rp-12', role: 'super_admin', module: 'orders', action: 'manage', enabled: true },
+      { id: 'rp-13', role: 'super_admin', module: 'codes', action: 'view', enabled: true },
+      { id: 'rp-14', role: 'super_admin', module: 'codes', action: 'manage', enabled: true },
+      { id: 'rp-15', role: 'super_admin', module: 'reports', action: 'view', enabled: true },
+      { id: 'rp-16', role: 'super_admin', module: 'reports', action: 'export', enabled: true },
+      { id: 'rp-17', role: 'super_admin', module: 'audit', action: 'view', enabled: true },
+      { id: 'rp-18', role: 'super_admin', module: 'settings', action: 'view', enabled: true },
+      { id: 'rp-19', role: 'super_admin', module: 'settings', action: 'manage', enabled: true },
+      { id: 'rp-20', role: 'super_admin', module: 'books', action: 'view', enabled: true },
+      { id: 'rp-21', role: 'super_admin', module: 'books', action: 'create', enabled: true },
+      { id: 'rp-22', role: 'super_admin', module: 'books', action: 'edit', enabled: true },
+      { id: 'rp-23', role: 'super_admin', module: 'books', action: 'delete', enabled: true },
+      // Support Agent - limited permissions
+      { id: 'rp-24', role: 'support_agent', module: 'orders', action: 'view', enabled: true },
+      { id: 'rp-25', role: 'support_agent', module: 'orders', action: 'manage', enabled: true },
+      { id: 'rp-26', role: 'support_agent', module: 'codes', action: 'view', enabled: true },
+      { id: 'rp-27', role: 'support_agent', module: 'codes', action: 'manage', enabled: true },
+      { id: 'rp-28', role: 'support_agent', module: 'reports', action: 'view', enabled: true },
+      { id: 'rp-29', role: 'support_agent', module: 'reports', action: 'export', enabled: true },
+      { id: 'rp-30', role: 'support_agent', module: 'users', action: 'view', enabled: true },
+      { id: 'rp-31', role: 'support_agent', module: 'partners', action: 'view', enabled: true },
+      { id: 'rp-32', role: 'support_agent', module: 'books', action: 'view', enabled: true },
+      // Partner Admin - organization-scoped permissions
+      { id: 'rp-33', role: 'partner_admin', module: 'users', action: 'view', enabled: true },
+      { id: 'rp-34', role: 'partner_admin', module: 'users', action: 'create', enabled: true },
+      { id: 'rp-35', role: 'partner_admin', module: 'users', action: 'edit', enabled: true },
+      { id: 'rp-36', role: 'partner_admin', module: 'orders', action: 'view', enabled: true },
+      { id: 'rp-37', role: 'partner_admin', module: 'orders', action: 'create', enabled: true },
+      { id: 'rp-38', role: 'partner_admin', module: 'codes', action: 'view', enabled: true },
+      { id: 'rp-39', role: 'partner_admin', module: 'reports', action: 'view', enabled: true },
+      { id: 'rp-40', role: 'partner_admin', module: 'reports', action: 'export', enabled: true },
+      { id: 'rp-41', role: 'partner_admin', module: 'books', action: 'view', enabled: true },
+      { id: 'rp-42', role: 'partner_admin', module: 'partners', action: 'view', enabled: true },
+      // Student - minimal permissions
+      { id: 'rp-43', role: 'student', module: 'books', action: 'view', enabled: true },
+      { id: 'rp-44', role: 'student', module: 'codes', action: 'view', enabled: true },
+    ],
   };
 }
 
@@ -713,6 +771,179 @@ class KitaboService {
       console.info('[Demo Mode] Admin-initiated password reset for:', user.email, '(no email sent in demo mode)');
       return { success: true };
     }
+  }
+
+  // ============================================
+  // USER DELETION (with protection)
+  // ============================================
+  async deleteUser(userId: string, actorId: string): Promise<ServiceResult<void>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized: Super Admin role required' };
+    }
+
+    const user = this.demoState!.users.find(u => u.id === userId);
+    if (!user) return { success: false, error: 'User not found' };
+
+    // Protection: cannot delete yourself
+    if (userId === actorId) {
+      return { success: false, error: 'Cannot delete your own account' };
+    }
+
+    // Protection: cannot delete the last super admin
+    if (user.role === 'super_admin') {
+      const superAdmins = this.demoState!.users.filter(u => u.role === 'super_admin' && u.status === 'active');
+      if (superAdmins.length <= 1) {
+        return { success: false, error: 'Cannot delete the last active Super Admin' };
+      }
+    }
+
+    // Soft delete: deactivate instead of hard delete
+    this.demoState!.users = this.demoState!.users.map(u => 
+      u.id === userId ? { ...u, status: 'deactivated' as UserStatus } : u
+    );
+
+    this.addAuditLog(actorId, 'user.deleted', 'User', userId, `Soft-deleted user ${user.name} (${user.email})`);
+    this.notify();
+    return { success: true };
+  }
+
+  // ============================================
+  // PARTNER EMAIL MANAGEMENT
+  // ============================================
+  getPartnerEmails(): PartnerEmail[] {
+    return this.demoState?.partnerEmails || [];
+  }
+
+  async addPartnerEmail(partnerId: string, email: string, actorId: string): Promise<ServiceResult<PartnerEmail>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return { success: false, error: 'Invalid email format' };
+    }
+
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check for duplicates across all partners
+    if (this.demoState!.partnerEmails.find(pe => pe.email === normalizedEmail)) {
+      return { success: false, error: 'Email address already associated with a partner' };
+    }
+
+    // Check if this is the first email for the partner (make it primary)
+    const existingEmails = this.demoState!.partnerEmails.filter(pe => pe.partnerId === partnerId);
+    const isPrimary = existingEmails.length === 0;
+
+    const newEmail: PartnerEmail = {
+      id: generateId(),
+      partnerId,
+      email: normalizedEmail,
+      isPrimary,
+      isVerified: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.demoState!.partnerEmails.push(newEmail);
+    this.addAuditLog(actorId, 'partner_email.added', 'PartnerEmail', newEmail.id, `Added email ${normalizedEmail} to partner ${partnerId}`);
+    this.notify();
+    return { success: true, data: newEmail };
+  }
+
+  async updatePartnerEmail(emailId: string, updates: Partial<PartnerEmail>, actorId: string): Promise<ServiceResult<PartnerEmail>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const partnerEmail = this.demoState!.partnerEmails.find(pe => pe.id === emailId);
+    if (!partnerEmail) return { success: false, error: 'Email not found' };
+
+    // If setting as primary, unset other primaries for this partner
+    if (updates.isPrimary) {
+      this.demoState!.partnerEmails = this.demoState!.partnerEmails.map(pe =>
+        pe.partnerId === partnerEmail.partnerId && pe.id !== emailId
+          ? { ...pe, isPrimary: false }
+          : pe
+      );
+    }
+
+    const updated: PartnerEmail = { ...partnerEmail, ...updates, id: emailId };
+    this.demoState!.partnerEmails = this.demoState!.partnerEmails.map(pe => pe.id === emailId ? updated : pe);
+    
+    this.addAuditLog(actorId, 'partner_email.updated', 'PartnerEmail', emailId, `Updated email ${updated.email}`);
+    this.notify();
+    return { success: true, data: updated };
+  }
+
+  async verifyPartnerEmail(emailId: string, actorId: string): Promise<ServiceResult<void>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const partnerEmail = this.demoState!.partnerEmails.find(pe => pe.id === emailId);
+    if (!partnerEmail) return { success: false, error: 'Email not found' };
+
+    this.demoState!.partnerEmails = this.demoState!.partnerEmails.map(pe =>
+      pe.id === emailId ? { ...pe, isVerified: true, verifiedAt: new Date().toISOString() } : pe
+    );
+
+    this.addAuditLog(actorId, 'partner_email.verified', 'PartnerEmail', emailId, `Verified email ${partnerEmail.email}`);
+    this.notify();
+    return { success: true };
+  }
+
+  async deletePartnerEmail(emailId: string, actorId: string): Promise<ServiceResult<void>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const partnerEmail = this.demoState!.partnerEmails.find(pe => pe.id === emailId);
+    if (!partnerEmail) return { success: false, error: 'Email not found' };
+
+    this.demoState!.partnerEmails = this.demoState!.partnerEmails.filter(pe => pe.id !== emailId);
+    this.addAuditLog(actorId, 'partner_email.deleted', 'PartnerEmail', emailId, `Deleted email ${partnerEmail.email}`);
+    this.notify();
+    return { success: true };
+  }
+
+  // ============================================
+  // ROLE PERMISSIONS
+  // ============================================
+  getRolePermissions(): RolePermission[] {
+    return this.demoState?.rolePermissions || [];
+  }
+
+  async updateRolePermission(permissionId: string, enabled: boolean, actorId: string): Promise<ServiceResult<void>> {
+    const actor = this.demoState!.users.find(u => u.id === actorId);
+    if (!actor || actor.role !== 'super_admin') {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const permission = this.demoState!.rolePermissions.find(rp => rp.id === permissionId);
+    if (!permission) return { success: false, error: 'Permission not found' };
+
+    this.demoState!.rolePermissions = this.demoState!.rolePermissions.map(rp =>
+      rp.id === permissionId ? { ...rp, enabled } : rp
+    );
+
+    this.addAuditLog(actorId, 'permission.updated', 'RolePermission', permissionId, 
+      `Updated ${permission.role}.${permission.module}.${permission.action} to ${enabled}`);
+    this.notify();
+    return { success: true };
+  }
+
+  hasPermission(role: UserRole, module: PermissionModule, action: PermissionAction): boolean {
+    const permission = this.demoState?.rolePermissions.find(
+      rp => rp.role === role && rp.module === module && rp.action === action
+    );
+    return permission?.enabled || false;
   }
 }
 

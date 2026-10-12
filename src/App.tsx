@@ -3,6 +3,8 @@ import { AppProvider, useApp } from './store';
 import { v4 as uuidv4 } from 'uuid';
 import { useState, useEffect } from 'react';
 import type { UserRole, Order, OrderStatus, CodeStatus, Book, User, AccessCode, BookEntitlement } from './types';
+import { AdminDashboard, UserManagement, PartnerManagement, PartnerEmails } from './pages/AdminPages';
+import { RolesPermissions } from './pages/RolesPermissions';
 import {
   BookOpen, Users, GraduationCap, Shield, Settings, LogOut, Home, Library,
   Key, BarChart3, FileText, Search, Plus, Edit, Trash2, Eye,
@@ -10,7 +12,7 @@ import {
   Menu, X, Bell, User as UserIcon, BookMarked, Clock, TrendingUp, AlertCircle,
   Check, Download, ArrowRight, Layers, Globe,
   Zap, ShoppingCart, Package, RefreshCw,
-  ClipboardList, FileDown, Smartphone, AlertTriangle, History
+  ClipboardList, FileDown, Smartphone, AlertTriangle, History, Mail
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -128,10 +130,14 @@ function Sidebar({ role }: { role: string }) {
   const [collapsed, setCollapsed] = useState(false);
   const links: Record<string, { to: string; icon: any; label: string }[]> = {
     super_admin: [
-      { to: '/admin', icon: Home, label: 'Dashboard' }, { to: '/admin/partners', icon: Globe, label: 'Partners' },
-      { to: '/admin/books', icon: Library, label: 'Books' }, { to: '/admin/orders', icon: ShoppingCart, label: 'Orders' },
-      { to: '/admin/codes', icon: Key, label: 'Access Codes' }, { to: '/admin/users', icon: Users, label: 'Users' },
-      { to: '/admin/reports', icon: BarChart3, label: 'Reports' }, { to: '/admin/audit', icon: FileText, label: 'Audit Log' },
+      { to: '/admin', icon: Home, label: 'Dashboard' },
+      { to: '/admin/users', icon: Users, label: 'User Management' },
+      { to: '/admin/roles', icon: Shield, label: 'Roles & Permissions' },
+      { to: '/admin/partners', icon: Globe, label: 'Partner Management' },
+      { to: '/admin/emails', icon: Mail, label: 'Partner Emails' },
+      { to: '/admin/orders', icon: ShoppingCart, label: 'Orders & Codes' },
+      { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
+      { to: '/admin/audit', icon: FileText, label: 'Audit Logs' },
       { to: '/admin/settings', icon: Settings, label: 'Settings' },
     ],
     support_agent: [
@@ -1028,12 +1034,14 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<AuthRoute />} />
-          <Route path="/admin" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><SuperAdminDashboard /></AppLayout></ProtectedRoute>} />
-          <Route path="/admin/partners" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminPartners /></AppLayout></ProtectedRoute>} />
-          <Route path="/admin/books" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminBooks /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminDashboard /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><UserManagement /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/roles" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><RolesPermissions /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/partners" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><PartnerManagement /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/emails" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><PartnerEmails /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/orders" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminOrders /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/codes" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminCodes /></AppLayout></ProtectedRoute>} />
-          <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminUsers /></AppLayout></ProtectedRoute>} />
+          <Route path="/admin/books" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminBooks /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminReports /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/audit" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminAudit /></AppLayout></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['super_admin']}><AppLayout role="super_admin"><AdminSettings /></AppLayout></ProtectedRoute>} />

@@ -4,7 +4,8 @@ import { kitaboService } from '../services/kitabo';
 import type {
   User, LearningPartner, Classroom, Book, AccessCode, AccessCodeBatch, Order,
   BookEntitlement, ReadingProgress, Bookmark, Highlight, AuditLogEntry,
-  RegisteredDevice, ExportRecord, UserRole, OrderStatus, CodeStatus
+  RegisteredDevice, ExportRecord, UserRole, OrderStatus, CodeStatus,
+  PartnerEmail, RolePermission
 } from '../types';
 
 // ===== Book Content (static, not from backend) =====
@@ -33,6 +34,8 @@ interface AppState {
   currentUser: User | null;
   users: User[];
   partners: LearningPartner[];
+  partnerEmails: PartnerEmail[];
+  rolePermissions: RolePermission[];
   classrooms: Classroom[];
   books: Book[];
   orders: Order[];
@@ -81,8 +84,8 @@ function reducer(state: AppState, action: Action): AppState {
 }
 
 const initialState: AppState = {
-  currentUser: null, users: [], partners: [], classrooms: [], books: [],
-  orders: [], codes: [], batches: [], entitlements: [], devices: [],
+  currentUser: null, users: [], partners: [], partnerEmails: [], rolePermissions: [],
+  classrooms: [], books: [], orders: [], codes: [], batches: [], entitlements: [], devices: [],
   progress: [], bookmarks: [], highlights: [], auditLogs: [], exports: [],
   notifications: [], isLoading: true, isDemoMode: false,
 };
@@ -101,6 +104,7 @@ interface AppContextType {
   redeemCode: (code: string) => Promise<{ success: boolean; error?: string }>;
   revokeCode: (codeId: string, reason: string) => Promise<{ success: boolean; error?: string }>;
   updateUser: (userId: string, updates: Partial<User>) => Promise<{ success: boolean; error?: string }>;
+  deleteUser: (userId: string) => Promise<{ success: boolean; error?: string }>;
   exportCodesCSV: (orderId: string) => { success: boolean; data?: string; error?: string };
   requestPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   adminInitiatePasswordReset: (userId: string) => Promise<{ success: boolean; error?: string }>;
@@ -116,6 +120,13 @@ interface AppContextType {
   addHighlight: (highlight: Highlight) => Promise<void>;
   deleteHighlight: (id: string) => Promise<void>;
   registerDevice: (device: RegisteredDevice) => Promise<void>;
+  // New Super Admin operations
+  addPartnerEmail: (partnerId: string, email: string) => Promise<{ success: boolean; error?: string }>;
+  updatePartnerEmail: (emailId: string, updates: any) => Promise<{ success: boolean; error?: string }>;
+  verifyPartnerEmail: (emailId: string) => Promise<{ success: boolean; error?: string }>;
+  deletePartnerEmail: (emailId: string) => Promise<{ success: boolean; error?: string }>;
+  updateRolePermission: (permissionId: string, enabled: boolean) => Promise<{ success: boolean; error?: string }>;
+  hasPermission: (role: any, module: any, action: any) => boolean;
   syncFromService: () => void;
 }
 
@@ -178,6 +189,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       payload: {
         users: kitaboService.getUsers(),
         partners: kitaboService.getPartners(),
+        partnerEmails: kitaboService.getPartnerEmails(),
+        rolePermissions: kitaboService.getRolePermissions(),
         classrooms: kitaboService.getClassrooms(),
         books: kitaboService.getBooks(),
         orders: kitaboService.getOrders(),
@@ -289,15 +302,65 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteHighlight = async (id: string) => { await kitaboService.deleteHighlight(id); syncFromService(); };
   const registerDevice = async (device: RegisteredDevice) => { await kitaboService.registerDevice(device); syncFromService(); };
 
+  // New Super Admin operations
+  const deleteUser = async (userId: string) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.deleteUser(userId, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
+  const addPartnerEmail = async (partnerId: string, email: string) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.addPartnerEmail(partnerId, email, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
+  const updatePartnerEmail = async (emailId: string, updates: any) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.updatePartnerEmail(emailId, updates, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
+  const verifyPartnerEmail = async (emailId: string) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.verifyPartnerEmail(emailId, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
+  const deletePartnerEmail = async (emailId: string) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.deletePartnerEmail(emailId, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
+  const updateRolePermission = async (permissionId: string, enabled: boolean) => {
+    if (!state.currentUser) return { success: false, error: 'Not authenticated' };
+    const result = await kitaboService.updateRolePermission(permissionId, enabled, state.currentUser.id);
+    if (result.success) syncFromService();
+    return { success: result.success, error: result.error };
+  };
+
+  const hasPermission = (role: any, module: any, action: any) => {
+    return kitaboService.hasPermission(role, module, action);
+  };
+
   return (
     <AppContext.Provider value={{
       state, dispatch, getBookContent,
       signIn, signUp, signOut, createOrder, updateOrderStatus, fulfillOrder,
-      redeemCode, revokeCode, updateUser, exportCodesCSV,
+      redeemCode, revokeCode, updateUser, deleteUser, exportCodesCSV,
       requestPasswordReset, adminInitiatePasswordReset,
       addPartner, updatePartner, addBook, updateBook, addClassroom, addUser,
       updateProgress, addBookmark, deleteBookmark, addHighlight, deleteHighlight,
-      registerDevice, syncFromService,
+      registerDevice,
+      addPartnerEmail, updatePartnerEmail, verifyPartnerEmail, deletePartnerEmail,
+      updateRolePermission, hasPermission,
+      syncFromService,
     }}>
       {children}
     </AppContext.Provider>
